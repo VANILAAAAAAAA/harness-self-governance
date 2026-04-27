@@ -1,0 +1,8 @@
+version: 0.2.0
+mode_default: report_only
+node_types: [profile, knowledge_raw, knowledge_claim, wiki_page, skill, tool, harness_module, experiment, result, decision, factor, event, tombstone, export_summary, user_preference]
+edge_types: [profile_owns, profile_uses, profile_exports, profile_imports, governs, proposes_change, applies_change, derived_from, cites, supports, refutes, contradicts, supersedes, depends_on, invokes, reads, writes, caused_by, confounds, precedes, pruned_to, rehydrates]
+event_types: [task_success, task_failure, tool_error, user_correction, rehydration, prune, quarantine, supersession, audit, export, proposal]
+states: [hot, warm, cold, quarantine, delete_candidate, deleted, pinned]
+sensitivity_labels: [none, internal, sensitive, phi_or_patient_level, credential]
+deletion_policies: [immutable, confirm, quarantine, delete_derivatives_only]

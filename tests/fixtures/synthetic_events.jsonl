@@ -1,0 +1,2 @@
+{"id":"event:2026-01-01:audit","type":"audit","profile":"lab","task":"synthetic audit","used_nodes":["skill:structured-text-transform"],"changed_nodes":[],"changed_edges":[],"outcome":{"success":true},"timestamp":"2026-01-01T00:00:00Z","notes":"synthetic"}
+{"id":"event:2026-01-02:export","type":"export","profile":"lab","task":"synthetic export","used_nodes":["export:lab-health"],"changed_nodes":[],"changed_edges":[],"outcome":{"success":true},"timestamp":"2026-01-02T00:00:00Z","notes":"synthetic"}

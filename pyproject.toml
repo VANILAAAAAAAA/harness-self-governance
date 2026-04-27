@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "graph-harness-maintain"
+version = "0.1.0a0"
+description = "Read-first graph-harness adapter for validation, dependency-closed retrieval, sidecar annotation checks, and sanitized exports."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "graph-harness maintainers"}]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+]
+dependencies = []
+
+[project.scripts]
+graph-harness-maintain = "graph_harness_maintain.cli:main"
+agent-graph = "graph_harness_maintain.cli:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/graph_harness_maintain"]

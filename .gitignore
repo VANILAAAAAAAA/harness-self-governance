@@ -1,0 +1,59 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# Local/private run outputs
+artifacts/
+reports/
+proposals/
+*.local.*
+*hash*
+*smoke*
+*validate*
+
+# Raw data and private datasets
+raw/
+raw-data/
+data/raw/
+private-data/
+patient-data/
+ehr-data/
+*.parquet
+*.feather
+*.db
+*.sqlite
+*.sqlite3
+
+# Sessions and private Hermes state
+sessions/
+session_*.json
+state.db
+*.session
+
+# Credentials and tokens
+.env
+.env.*
+*.env
+*credential*
+*credentials*
+*secret*
+*secrets*
+*token*
+*tokens*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
