@@ -59,6 +59,7 @@ All examples use synthetic fixtures. Public exports redact absolute paths and ag
 - [Safety model](docs/safety-model.md)
 - [Storage guard](docs/storage-guard.md)
 - [Roadmap](docs/roadmap.md)
+- [Project status](docs/project-status.md)
 
 ## Roadmap summary
 
