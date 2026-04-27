@@ -4,6 +4,34 @@
 
 `graph-harness-maintain` is a graph-governed, read-only maintenance adapter for agent harnesses. The v1.0 goal is to validate a graph-harness control plane, retrieve small dependency-closed subgraphs, produce sanitized dry-run exports, and generate storage/archive proposals without applying destructive changes.
 
+## v1.0 public architecture
+
+```mermaid
+flowchart LR
+    User[User] --> Agent[Hermes Agent]
+    Agent --> Governance[Governance Layer]
+
+    Governance --> Ledger[Provenance Ledger]
+    Governance --> Reports[Audit Reports]
+    Governance --> Adapter[Read-only Adapter]
+
+    Adapter --> Locator[Evidence Locator]
+    Locator --> Reports
+    Ledger --> Reports
+
+    Reports --> Repo[Public Repository]
+
+    Gate{Human approval required} -. gates .-> WriteActions[Write / move / delete]
+    Gate -. gates .-> ArchiveActions[Quarantine / rehydrate]
+    Gate -. gates .-> ProvenanceActions[Provenance mutation]
+
+    Adapter -. proposal only .-> Gate
+```
+
+v1.0 is limited to the control layer, audit layer, and read-only maintenance adapter. Write, move, delete, quarantine, rehydrate, and provenance mutation workflows remain gated or deferred.
+
+Template directory waiver: `templates/` is not required for the v1.0/v1.1 public release surface. The public package uses source modules, tests, documentation, and scripts; template scaffolding can be added later only if a future release introduces reusable generated-file templates.
+
 ## v1.0 safety contract
 
 This project is intentionally conservative:
