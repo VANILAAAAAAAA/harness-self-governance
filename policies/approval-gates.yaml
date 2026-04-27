@@ -1,0 +1,37 @@
+version: 1
+policy_name: v1-approval-gates
+
+allowed_without_human_approval:
+  - read_only_audit
+  - local_tests
+  - local_leak_scan
+  - local_report_generation
+  - local_evidence_index_generation
+  - local_provenance_state_generation
+  - package_import_smoke_test
+  - cli_smoke_test
+  - local_docs_edit
+  - local_policy_edit
+  - local_template_edit
+
+always_require_human_approval:
+  - git_commit
+  - git_push
+  - git_tag
+  - github_release
+  - pypi_publish
+  - raw_archive_apply
+  - delete
+  - move
+  - graph_events_mutation
+  - quarantine
+  - rehydrate
+  - provenance_upgrade
+  - sensitive_export
+
+blocked_in_v1:
+  - destructive_file_operation
+  - remote_publication_without_approval
+  - credential_export
+  - private_path_export
+  - unreviewed_identity_change

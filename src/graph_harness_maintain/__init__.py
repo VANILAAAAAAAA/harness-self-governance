@@ -1,3 +1,3 @@
-"""Read-first graph harness maintenance adapter."""
+"""Governance and audit pipeline for graph-harness-maintain."""
 
-__version__ = "0.1.0a0"
+__version__ = "1.0.0"

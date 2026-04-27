@@ -1,40 +1,17 @@
 # Security Policy
 
-## Pre-release scope
+## Reporting vulnerabilities
 
-`graph-harness-maintain` is pre-release software. The v1.0 line is limited to read-only and proposal-only graph-harness maintenance workflows.
+Report vulnerabilities through a private maintainer channel or repository security advisory when available.
 
-## Do not commit sensitive material
+## Do not include sensitive data in issues
 
-Do not commit or upload:
+Do not include tokens, credentials, private paths, raw datasets, or sensitive exported artifacts in public issues.
 
-- raw EHR data;
-- patient-level data;
-- forbidden protected regulated records;
-- credentials;
-- tokens;
-- API keys;
-- private local sessions;
-- private graph-harness reports, proposals, or artifacts;
-- local absolute paths that identify private workspaces or datasets.
+## Approval-gated actions
 
-Use synthetic fixtures for tests and examples.
+The following actions remain behind explicit human approval in v1.0: commit, push, tag, release, publish, raw archive apply, delete, move, graph/events mutation, quarantine, rehydrate, provenance upgrade, and sensitive export.
 
-## Destructive actions are out of scope for v1.0
+## Token and private path handling
 
-The v1.0 public source does not provide execution paths for:
-
-- apply operations;
-- delete operations;
-- quarantine execution;
-- rehydrate execution;
-- raw archive apply;
-- provenance upgrade;
-- graph/events mutation;
-- release publishing.
-
-Any future apply-capable design must be reviewed separately and protected by explicit human approval gates.
-
-## Reporting security issues
-
-For public repository use, open a GitHub security advisory or private maintainer contact channel once configured. Do not include sensitive datasets, credentials, or raw private paths in public issues.
+Public-facing docs, templates, tests, and package metadata must not contain token-like strings, credentials, private profile paths, or machine-specific absolute paths.

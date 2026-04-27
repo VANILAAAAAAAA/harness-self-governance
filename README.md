@@ -1,100 +1,145 @@
 # graph-harness-maintain
 
-**Status:** pre-release / v1.0 in progress.
+**Status:** v1.0 local governance pipeline.
 
-`graph-harness-maintain` is a graph-governed, read-only maintenance adapter for agent harnesses. The v1.0 goal is to validate a graph-harness control plane, retrieve small dependency-closed subgraphs, produce sanitized dry-run exports, and generate storage/archive proposals without applying destructive changes.
+`graph-harness-maintain` provides a conservative, local-only governance and audit pipeline for agent-maintained repositories. It inspects repository identity, release surface, approval gates, evidence, provenance, tests, smoke checks, and leak scanning before any external publication step.
 
-## v1.0 public architecture
+## Project purpose
+
+The project exists to keep a maintenance harness observable, auditable, and approval-gated. v1.0 focuses on read-only inspection, local artifact generation, and proposal-only recommendations.
+
+## v1.0 scope
+
+v1.0 includes:
+
+- identity guard
+- git state inspection
+- open-source release surface audit
+- approval gate enforcement
+- read-only maintenance adapters
+- evidence indexing
+- local provenance state generation
+- tests and smoke checks
+- leak scan and sensitive-term review
+- local report generation
+
+v1.0 does **not** execute destructive actions, remote publication, graph/events mutation, quarantine, rehydrate, provenance upgrade, or sensitive export.
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    User[User] --> Agent[Hermes Agent]
-    Agent --> Governance[Governance Layer]
-
-    Governance --> Ledger[Provenance Ledger]
-    Governance --> Reports[Audit Reports]
-    Governance --> Adapter[Read-only Adapter]
-
-    Adapter --> Locator[Evidence Locator]
-    Locator --> Reports
-    Ledger --> Reports
-
-    Reports --> Repo[Public Repository]
-
-    Gate{Human approval required} -. gates .-> WriteActions[Write / move / delete]
-    Gate -. gates .-> ArchiveActions[Quarantine / rehydrate]
-    Gate -. gates .-> ProvenanceActions[Provenance mutation]
-
-    Adapter -. proposal only .-> Gate
+    User[User] --> CLI[ghm CLI]
+    CLI --> Pipeline[local-rc pipeline]
+    Pipeline --> Identity[identity guard]
+    Pipeline --> GitState[git state audit]
+    Pipeline --> Surface[open-source surface audit]
+    Pipeline --> Gates[approval gate policy]
+    Pipeline --> Adapters[read-only adapters]
+    Pipeline --> Evidence[evidence index]
+    Pipeline --> Provenance[local provenance state]
+    Pipeline --> Validation[tests + smoke + leak scan]
+    Validation --> Report[v1-local-rc-report.md]
+    Gates -. blocks .-> Publish[commit/push/tag/release/publish]
 ```
 
-v1.0 is limited to the control layer, audit layer, and read-only maintenance adapter. Write, move, delete, quarantine, rehydrate, and provenance mutation workflows remain gated or deferred.
+## Install
 
-Template directory waiver: `templates/` is not required for the v1.0/v1.1 public release surface. The public package uses source modules, tests, documentation, and scripts; template scaffolding can be added later only if a future release introduces reusable generated-file templates.
+```bash
+python3 -m pip install -e ".[dev]"
+```
 
-## v1.0 safety contract
+## CLI usage
 
-This project is intentionally conservative:
+```bash
+ghm --help
+ghm identity-check
+ghm audit-release
+ghm locate-evidence
+ghm check-gates
+ghm provenance current-state
+ghm pipeline local-rc
+ghm pipeline local-rc --strict
+ghm pipeline local-rc --ci
+```
 
-- read-only by default;
-- proposal-only for archive planning;
-- no apply execution;
-- no delete execution;
-- no quarantine execution;
-- no rehydrate execution;
-- no provenance upgrade execution;
-- no `caused_by` generation;
-- no graph/event mutation;
-- no prompt assembly takeover;
-- no daemon, database service, or vector store.
+Module form also works:
 
-The adapter can load graph-harness records such as `graph.jsonl`, `events.jsonl`, schema files, and sidecar indexes for validation and review, but it must not modify them.
+```bash
+python -m graph_harness_maintain --help
+python -m graph_harness_maintain pipeline local-rc
+```
 
-## CLI surface
-
-The public v1.0 CLI is limited to read-only or proposal-only commands:
+Legacy read-only graph commands remain available:
 
 ```bash
 graph-harness-maintain validate --schema tests/fixtures/synthetic_schema.yaml --graph tests/fixtures/synthetic_graph.jsonl --events tests/fixtures/synthetic_events.jsonl --evidence-candidates tests/fixtures/synthetic_evidence_candidate_index.jsonl --weak-associations tests/fixtures/synthetic_weak_association_sidecar_index.jsonl
-
-graph-harness-maintain inspect --schema tests/fixtures/synthetic_schema.yaml --graph tests/fixtures/synthetic_graph.jsonl --events tests/fixtures/synthetic_events.jsonl
-
-graph-harness-maintain retrieve --task "structured transform" --profile lab --schema tests/fixtures/synthetic_schema.yaml --graph tests/fixtures/synthetic_graph.jsonl --events tests/fixtures/synthetic_events.jsonl --out artifacts/subgraph.json
-
-graph-harness-maintain export-sanitized-dry-run --profile lab --schema tests/fixtures/synthetic_schema.yaml --graph tests/fixtures/synthetic_graph.jsonl --events tests/fixtures/synthetic_events.jsonl --out artifacts/export.json
-
-graph-harness-maintain storage-audit --active-root . --archive-root "$ARCHIVE_ROOT" --out artifacts/storage_audit.json
-
-graph-harness-maintain raw-archive-proposal --active-root . --archive-root "$ARCHIVE_ROOT" --out artifacts/raw_archive_proposal.json
 ```
 
-`storage-audit` reports capacity statistics only. `raw-archive-proposal` writes a proposal only. There is no public v1.0 CLI command that applies raw archive actions.
+## Pipeline command
+
+Primary local release-candidate command:
+
+```bash
+ghm pipeline local-rc
+```
+
+## Approval gates
+
+Allowed without human approval:
+
+- read-only audit
+- local tests
+- local leak scan
+- local report generation
+- local evidence index generation
+- local provenance state generation
+- package import smoke test
+- CLI smoke test
+- local docs/policy/template edits
+
+Always require human approval:
+
+- `git_commit`
+- `git_push`
+- `git_tag`
+- `github_release`
+- `pypi_publish`
+- `raw_archive_apply`
+- `delete`
+- `move`
+- `graph_events_mutation`
+- `quarantine`
+- `rehydrate`
+- `provenance_upgrade`
+- `sensitive_export`
+
+## Security model
+
+- public-facing files must not contain tokens, credentials, local absolute paths, or private profile paths
+- runtime reports stay local
+- release readiness stops before publication actions
+- adapter mutations are blocked behind approval requirements
+
+## Limitations
+
+- no destructive apply path in v1.0
+- no remote publication execution
+- no graph/event mutation
+- no provenance upgrade
+- no sensitive export
 
 ## Development checks
 
 ```bash
-uv run --with pytest pytest -q
-python3 scripts/release_leak_scan.py --out artifacts/release_leak_scan.json
-python3 scripts/package_build_check.py --out artifacts/package_build_check.json
+pytest
+python -m graph_harness_maintain pipeline local-rc
 ```
-
-All examples use synthetic fixtures. Public exports redact absolute paths and aggregate sidecar information.
-
-## Documentation
-
-- [Architecture](docs/architecture.md)
-- [Quickstart](docs/quickstart.md)
-- [Safety model](docs/safety-model.md)
-- [Storage guard](docs/storage-guard.md)
-- [Roadmap](docs/roadmap.md)
-- [Project status](docs/project-status.md)
-
-## Roadmap summary
-
-- **v1.0:** read-only graph-governed maintenance adapter; validation, inspection, retrieval, sanitized dry-run export, storage audit, and archive proposal generation.
-- **v1.1:** stronger schema diagnostics, richer report formatting, and safer packaging ergonomics while preserving read-only/proposal-only boundaries.
-- **v2.0:** optional apply workflows may be designed, but only behind explicit policy gates, independent review, provenance manifests, and human approval.
 
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
