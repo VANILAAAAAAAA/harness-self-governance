@@ -95,12 +95,13 @@ def run_tests(repo_root: Path, artifact_path: Path) -> dict:
     return result
 
 
-def run_smoke_tests(repo_root: Path, artifact_path: Path) -> dict:
+def run_smoke_tests(repo_root: Path, artifact_path: Path, ci_mode: bool = False) -> dict:
     ghm_command = [sys.executable, "-m", "graph_harness_maintain"]
+    identity_command = ghm_command + ["identity-check"] + (["--ci"] if ci_mode else [])
     commands = [
         [sys.executable, "-c", "import graph_harness_maintain; print(graph_harness_maintain.__version__)"],
         ghm_command + ["--help"],
-        ghm_command + ["identity-check"],
+        identity_command,
         ghm_command + ["check-gates"],
         ghm_command + ["audit-release"],
     ]
@@ -130,7 +131,7 @@ def run_local_rc(repo_root: Path, strict: bool = False, ci_mode: bool = False, s
     gates = write_gate_check(repo_root, artifacts_root / "approval-gate-check.json", policy_path)
     adapter = adapter_audit(repo_root, artifacts_root / "adapter-audit.json")
     tests = run_tests(repo_root, artifacts_root / "test-results.json")
-    smoke = run_smoke_tests(repo_root, artifacts_root / "smoke-tests.json")
+    smoke = run_smoke_tests(repo_root, artifacts_root / "smoke-tests.json", ci_mode=ci_mode)
     leak_scan = write_leak_scan(repo_root, artifacts_root / "leak-scan.json")
 
     stage_results = {

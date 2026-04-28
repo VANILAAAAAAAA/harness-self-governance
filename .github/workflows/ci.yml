@@ -9,16 +9,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: python -m pip install --upgrade pip
-      - run: python -m pip install -e ".[dev]"
-      - name: Configure Git identity for tests
+
+      - name: Configure Git identity for CI
         run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name
+          git config --local user.email
           git var GIT_AUTHOR_IDENT
           git var GIT_COMMITTER_IDENT
-      - run: pytest
+
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m pytest
       - run: python -m graph_harness_maintain pipeline local-rc --ci

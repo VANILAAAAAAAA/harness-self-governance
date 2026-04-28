@@ -25,7 +25,7 @@ REQUIRED_ARTIFACTS = [
 
 
 def test_local_rc_produces_all_required_artifact_files() -> None:
-    result = run_local_rc(ROOT, strict=False, ci_mode=False)
+    result = run_local_rc(ROOT, strict=False, ci_mode=True)
     for rel in REQUIRED_ARTIFACTS:
         assert (ROOT / rel).exists(), rel
     assert result["artifacts"]
@@ -42,19 +42,20 @@ def test_run_tests_skips_recursive_pytest_when_guard_env_is_set(tmp_path: Path, 
 
 
 def test_strict_mode_returns_failure_on_blockers() -> None:
-    result = run_local_rc(ROOT, strict=True, ci_mode=False, stage_overrides={"leak_scan": {"status": "FAIL", "blocking_count": 1}})
+    result = run_local_rc(ROOT, strict=True, ci_mode=True, stage_overrides={"leak_scan": {"status": "FAIL", "blocking_count": 1}})
     assert result["exit_code"] == 5
     assert result["status"] == "FAIL"
 
 
-def test_normal_mode_reports_warnings() -> None:
+def test_pipeline_ci_mode_passes_identity_semantics() -> None:
     result = run_local_rc(ROOT, strict=False, ci_mode=True)
     assert result["status"] in {"PASS", "PASS_WITH_WARNINGS"}
     assert "human_approval_required" in result
+    assert not any("identity" in blocker.lower() for blocker in result["blockers"])
 
 
 def test_pipeline_is_idempotent() -> None:
-    first = run_local_rc(ROOT, strict=False, ci_mode=False)
-    second = run_local_rc(ROOT, strict=False, ci_mode=False)
+    first = run_local_rc(ROOT, strict=False, ci_mode=True)
+    second = run_local_rc(ROOT, strict=False, ci_mode=True)
     assert first["artifacts"] == second["artifacts"]
     assert second["status"] in {"PASS", "PASS_WITH_WARNINGS"}

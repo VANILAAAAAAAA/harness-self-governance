@@ -80,7 +80,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     provenance = sub.add_parser("provenance", help="Provenance state commands")
     provenance_sub = provenance.add_subparsers(dest="provenance_cmd", required=True)
-    provenance_sub.add_parser("current-state", help="Generate current local provenance state")
+    p = provenance_sub.add_parser("current-state", help="Generate current local provenance state")
+    p.add_argument("--ci", action="store_true")
     p = provenance_sub.add_parser("append", help="Append a local-test provenance event under artifacts/")
     p.add_argument("--local-test", action="store_true", help="Required: only local test append is supported")
     p.add_argument("--note", default="")
@@ -196,7 +197,7 @@ def main(argv=None) -> int:
 
     if args.cmd == "provenance" and args.provenance_cmd == "current-state":
         git_state = collect_git_state(repo_root)
-        identity = run_identity_check(repo_root, artifacts_root / "identity-check.json", ci_mode=False)
+        identity = run_identity_check(repo_root, artifacts_root / "identity-check.json", ci_mode=args.ci)
         gates = write_gate_check(repo_root, artifacts_root / "approval-gate-check.json", policy_path)
         state = build_current_state(
             repo_name="harness-self-governance",
