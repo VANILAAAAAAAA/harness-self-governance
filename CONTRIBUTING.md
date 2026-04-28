@@ -15,7 +15,10 @@ pytest
 ## Pipeline command
 
 ```bash
-ghm pipeline local-rc
+ghm pipeline local-rc --ci
+ghm pipeline local-rc --strict
+ghm pipeline v1.1-rc
+ghm pipeline v1.1-rc --strict
 ```
 
 ## Identity rule
@@ -37,7 +40,7 @@ Expected local identity:
 
 ## Approval rules
 
-The v1.0 pipeline never performs commit, push, tag, release, publish, delete, move, raw archive apply, graph/events mutation, quarantine, rehydrate, provenance upgrade, or sensitive export without explicit human approval.
+The v1.0 and v1.1 pipelines never perform commit, push, tag, release, publish, delete, move, raw archive apply, graph mutation, graph/events mutation, quarantine, rehydrate, provenance upgrade, reviewed apply, apply-plan execution, force push, or sensitive export without explicit human approval.
 
 ## Sensitive material
 

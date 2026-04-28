@@ -10,7 +10,7 @@ Do not include tokens, credentials, private paths, raw datasets, or sensitive ex
 
 ## Approval-gated actions
 
-The following actions remain behind explicit human approval in v1.0: commit, push, tag, release, publish, raw archive apply, delete, move, graph/events mutation, quarantine, rehydrate, provenance upgrade, and sensitive export.
+The following actions remain behind explicit human approval in v1.0 and v1.1: commit, push, tag, release, publish, raw archive apply, delete, move, graph mutation, graph/events mutation, quarantine, rehydrate, provenance upgrade, reviewed apply, apply-plan execution, force push, and sensitive export.
 
 ## Token and private path handling
 

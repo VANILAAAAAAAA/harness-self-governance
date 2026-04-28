@@ -31,7 +31,7 @@ def _write_repo_layout(root: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
     (root / "README.md").write_text(
-        "# graph-harness-maintain\n\nPurpose\n\n## Install\n\npip install -e .\n\n## CLI usage\n\nghm pipeline local-rc\n\n## v1.0 scope\n\nread-only\n\n## approval gates\n\ncommit requires approval\n\n## architecture\n\ndiagram\n",
+        "# graph-harness-maintain\n\nPurpose\n\n## Install\n\npip install -e .\n\n## CLI usage\n\nghm pipeline local-rc\nghm pipeline v1.1-rc\n\n## v1.0 scope\n\nread-only\n\n## v1.1 scope\n\nproposal-only\n\n## Artifact layout\n\nartifacts/v1/ and artifacts/v1.1/\n\n## Safety boundary\n\ndestructive operations blocked\n\n## approval gates\n\ncommit requires approval\n\n## architecture\n\ndiagram\n",
         encoding="utf-8",
     )
 
@@ -41,6 +41,8 @@ def test_readme_check(tmp_path: Path) -> None:
     audit = audit_release_surface(tmp_path)
     assert audit["checks"]["readme_exists"]["status"] == "PASS"
     assert audit["checks"]["readme_usage"]["status"] == "PASS"
+    assert audit["checks"]["readme_artifact_paths"]["status"] == "PASS"
+    assert audit["checks"]["readme_safety_boundary"]["status"] == "PASS"
 
 
 def test_license_check(tmp_path: Path) -> None:

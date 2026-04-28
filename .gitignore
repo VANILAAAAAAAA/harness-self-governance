@@ -10,6 +10,8 @@ build/
 *.egg-info/
 
 # Local/private run outputs
+artifacts/v1/
+artifacts/v1.1/
 artifacts/
 reports/
 proposals/
