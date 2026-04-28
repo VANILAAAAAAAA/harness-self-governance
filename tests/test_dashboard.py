@@ -59,6 +59,15 @@ def test_dashboard_file_generated_as_two_page_graph_logs_app() -> None:
         "selectLogGroup",
         "file-table-scroll",
         "toggleTheme",
+        "startCanvasPan",
+        "finishCanvasPan",
+        "panCanvasMove",
+        "contextmenu",
+        "ev.button === 0 || ev.button === 2",
+        "isCanvasPanning",
+        "folder-row:hover",
+        "tr:hover",
+        "min-height:0",
     ]:
         assert needle in html
     assert "toggleTheme" in html
