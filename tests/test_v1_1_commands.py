@@ -31,9 +31,17 @@ def test_proposal_create_and_validate_commands() -> None:
 
     manifest_data = json.loads(manifest.read_text(encoding="utf-8"))
     assert manifest_data["schema_version"] == "1.1"
+    assert manifest_data["version"] == "1.1"
+    assert manifest_data["scope"] == "v1.1 reviewed-action-layer local baseline"
+    assert manifest_data["operation_type"] == "reviewed_apply_plan"
+    assert manifest_data["evidence"]
+    assert manifest_data["required_approvals"] == ["human_review"]
+    assert manifest_data["destructive"] is False
+    assert manifest_data["apply_allowed"] is False
     assert manifest_data["apply_plan"]["review_gated"] is True
     assert manifest_data["apply_plan"]["human_approval_required"] is True
     assert "git_push" in manifest_data["blocked_actions"]
+    assert "graph_mutation" in manifest_data["blocked_actions"]
     assert manifest_data["actions"] == []
 
     validated = _run("proposal", "validate", "--manifest", str(manifest), "--report", str(report))
@@ -52,6 +60,18 @@ def test_proposal_validation_blocks_destructive_actions() -> None:
     result = validate_manifest(manifest)
     assert result["status"] == "FAIL"
     assert any("destructive" in item or "blocked action" in item for item in result["blockers"])
+
+
+def test_proposal_validation_requires_audit_evidence_and_blocks_apply() -> None:
+    from graph_harness_maintain.proposals import build_default_manifest, validate_manifest
+
+    manifest = build_default_manifest(ROOT, "bad apply proposal")
+    manifest["evidence"] = []
+    manifest["apply_allowed"] = True
+    result = validate_manifest(manifest)
+    assert result["status"] == "FAIL"
+    assert any("evidence" in item for item in result["blockers"])
+    assert any("apply_allowed" in item for item in result["blockers"])
 
 
 def test_templates_validate_command() -> None:
@@ -73,6 +93,15 @@ def test_adapter_report_command() -> None:
     assert {"GitRepoAdapter", "FileTreeAdapter", "ArtifactStoreAdapter"}.issubset(names)
     assert all(item["mutation_behavior"] == "approval_required" for item in data["adapters"])
     assert all(item["apply_executed"] is False for item in data["adapters"])
+    assert data["read_only_behavior"] is True
+    assert data["no_execution_side_effects"] is True
+    assert data["safety_boundary"]["proposal_only"] is True
+    assert data["safety_boundary"]["graph_mutation_allowed"] is False
+    assert all(item["capabilities"] for item in data["adapters"])
+    assert all(item["limitations"] for item in data["adapters"])
+    assert all(item["inputs"] for item in data["adapters"])
+    assert all(item["outputs"] for item in data["adapters"])
+    assert all(item["safety_boundary"]["read_only_behavior"] is True for item in data["adapters"])
 
 
 def test_provenance_append_local_test_command() -> None:
@@ -95,9 +124,11 @@ def test_pipeline_v1_1_rc_command() -> None:
     data = _json(result.stdout)
     assert data["status"] in {"PASS", "PASS_WITH_WARNINGS"}
     assert data["remote_publication_allowed"] is False
+    assert data["destructive_operations_allowed"] is False
     assert data["reviewed_apply_gated"] is True
     assert "artifacts/v1.1/v1.1-rc-report.md" in data["artifacts"]
     assert "git_push" in data["human_approval_required"]
+    assert "graph_mutation" in data["human_approval_required"]
 
 
 def test_pipeline_v1_1_rc_strict_command() -> None:

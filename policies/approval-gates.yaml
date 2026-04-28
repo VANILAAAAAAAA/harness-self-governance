@@ -29,6 +29,7 @@ always_require_human_approval:
   - raw_archive_apply
   - delete
   - move
+  - graph_mutation
   - graph_events_mutation
   - quarantine
   - rehydrate

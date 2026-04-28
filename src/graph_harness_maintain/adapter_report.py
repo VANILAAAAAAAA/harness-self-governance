@@ -20,6 +20,53 @@ def _rel(repo_root: Path, path: Path) -> str:
         return path.resolve().as_posix()
 
 
+def _sanitize_inspect(repo_root: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    sanitized: dict[str, Any] = {}
+    root_text = repo_root.as_posix()
+    for key, value in payload.items():
+        if isinstance(value, str) and value.startswith(root_text):
+            try:
+                sanitized[key] = Path(value).resolve().relative_to(repo_root).as_posix() or "."
+            except ValueError:
+                sanitized[key] = "<outside-repo>"
+        else:
+            sanitized[key] = value
+    return sanitized
+
+
+def _adapter_metadata(name: str) -> dict[str, Any]:
+    common_boundary = {
+        "read_only_behavior": True,
+        "no_execution_side_effects": True,
+        "mutation_behavior": "approval_required",
+        "apply_executed": False,
+        "destructive_operations_allowed": False,
+        "remote_publication_allowed": False,
+        "provenance_upgrade_allowed": False,
+    }
+    metadata = {
+        "GitRepoAdapter": {
+            "capabilities": ["inspect branch/head/status", "list tracked paths", "locate tracked source/test evidence"],
+            "limitations": ["does not push, tag, release, or rewrite history", "does not mutate git state"],
+            "inputs": ["repository git metadata", "tracked file list"],
+            "outputs": ["read-only git inspection summary", "review-gated proposal hints"],
+        },
+        "FileTreeAdapter": {
+            "capabilities": ["list repository files", "locate source/test/policy/template evidence"],
+            "limitations": ["does not delete, move, quarantine, or rehydrate files", "does not write graph/event stores"],
+            "inputs": ["repository file tree"],
+            "outputs": ["read-only file evidence summary", "review-gated proposal hints"],
+        },
+        "ArtifactStoreAdapter": {
+            "capabilities": ["list local artifacts", "locate JSON/Markdown artifact evidence"],
+            "limitations": ["does not publish artifacts remotely", "does not export sensitive data", "does not apply raw archives"],
+            "inputs": ["repository artifacts directory"],
+            "outputs": ["read-only artifact evidence summary", "review-gated proposal hints"],
+        },
+    }
+    return {**metadata.get(name, {}), "safety_boundary": common_boundary}
+
+
 def build_adapter_report(repo_root: Path) -> dict[str, Any]:
     repo_root = repo_root.resolve()
     adapters = [GitRepoAdapter(repo_root), FileTreeAdapter(repo_root), ArtifactStoreAdapter(repo_root)]
@@ -28,8 +75,19 @@ def build_adapter_report(repo_root: Path) -> dict[str, Any]:
         "schema_version": "1.1",
         "status": "PASS",
         "reviewed_action_layer": "proposal_only",
+        "read_only_behavior": True,
+        "no_execution_side_effects": True,
         "apply_executed": False,
         "blocked_actions": BLOCKED_ACTIONS,
+        "safety_boundary": {
+            "proposal_only": True,
+            "reviewed_apply_gated": True,
+            "destructive_operations_allowed": False,
+            "remote_publication_allowed": False,
+            "raw_archive_apply_allowed": False,
+            "graph_mutation_allowed": False,
+            "sensitive_export_allowed": False,
+        },
         "adapters": [],
         "warnings": [],
         "blockers": [],
@@ -37,22 +95,28 @@ def build_adapter_report(repo_root: Path) -> dict[str, Any]:
     for adapter in adapters:
         evidence = adapter.locate_evidence()
         proposals = adapter.propose_actions()
-        report["adapters"].append(
-            {
-                "name": adapter.__class__.__name__,
-                "inspect": adapter.inspect(),
-                "evidence_count": len(evidence),
-                "proposal_count": len(proposals),
-                "proposals": proposals,
-                "reviewed_action_support": "manifest_validation_only",
-                "mutation_behavior": "approval_required",
-                "apply_executed": False,
-                "destructive_operations_allowed": False,
-                "remote_publication_allowed": False,
-                "provenance_upgrade_allowed": False,
-                "maintenance_note": "adapter reports proposed actions only; mutation remains review-gated",
-            }
-        )
+        adapter_name = adapter.__class__.__name__
+        metadata = _adapter_metadata(adapter_name)
+        item = {
+            "name": adapter_name,
+            "inspect": _sanitize_inspect(repo_root, adapter.inspect()),
+            "evidence_count": len(evidence),
+            "proposal_count": len(proposals),
+            "proposals": proposals,
+            "reviewed_action_support": "manifest_validation_only",
+            "mutation_behavior": "approval_required",
+            "apply_executed": False,
+            "destructive_operations_allowed": False,
+            "remote_publication_allowed": False,
+            "provenance_upgrade_allowed": False,
+            "failure_modes": [],
+            "maintenance_note": "adapter reports proposed actions only; mutation remains review-gated",
+            **metadata,
+        }
+        for proposal in proposals:
+            if proposal.get("requires_human_approval") is True:
+                item["failure_modes"].append(f"proposal remains gated: {proposal.get('action')}")
+        report["adapters"].append(item)
     return report
 
 
@@ -76,6 +140,13 @@ def _render_markdown(report: dict[str, Any]) -> str:
                 f"- proposal_count: {item['proposal_count']}",
                 f"- mutation_behavior: {item['mutation_behavior']}",
                 f"- apply_executed: {item['apply_executed']}",
+                f"- read_only_behavior: {item['safety_boundary']['read_only_behavior']}",
+                f"- no_execution_side_effects: {item['safety_boundary']['no_execution_side_effects']}",
+                f"- capabilities: {', '.join(item['capabilities'])}",
+                f"- limitations: {', '.join(item['limitations'])}",
+                f"- inputs: {', '.join(item['inputs'])}",
+                f"- outputs: {', '.join(item['outputs'])}",
+                f"- failure_modes: {', '.join(item['failure_modes']) if item['failure_modes'] else 'none'}",
                 f"- maintenance_note: {item['maintenance_note']}",
                 "",
             ]

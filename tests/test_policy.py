@@ -18,17 +18,17 @@ def test_profile_boundary_sensitive_export_block():
 
 def test_looks_absolute_path_detects_anchored_and_embedded_paths():
     unsafe = [
-        '/home/vanila/private',
-        'prefix /home/vanila/private suffix',
+        '/home/example/private',
+        'prefix /home/example/private suffix',
         '/mnt/c/Users/example/file.txt',
         'prefix /mnt/d/ehr/file.csv suffix',
         '/tmp/graph-harness-secret',
         'prefix /tmp/graph-harness-secret suffix',
         r'C:\\Users\\example\\file.txt',
         r'prefix C:\\Users\\example\\file.txt suffix',
-        r'\\wsl$\\Ubuntu\\home\\vanila\\file.txt',
-        r'prefix \\wsl.localhost\\Ubuntu\\home\\vanila\\file.txt suffix',
-        'file:///home/vanila/private',
+        r'\\wsl$\\Ubuntu\\home\\example\\file.txt',
+        r'prefix \\wsl.localhost\\Ubuntu\\home\\example\\file.txt suffix',
+        'file:///home/example/private',
         'file:///C:/Users/example/file.txt',
         '/opt/unrecognized/absolute/path',
         'prefix /var/lib/private suffix',

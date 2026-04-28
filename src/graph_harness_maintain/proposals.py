@@ -32,6 +32,7 @@ GATED_ACTIONS = {
     "git_commit",
     "reviewed_apply",
     "apply_plan_execute",
+    "graph_mutation",
     "graph_events_mutation",
     "provenance_upgrade",
     "sensitive_export",
@@ -55,16 +56,28 @@ ALLOWED_LOCAL_ACTIONS = {
 }
 REQUIRED_FIELDS = [
     "schema_version",
+    "version",
     "manifest_kind",
     "proposal_id",
     "title",
     "status",
     "created_at",
+    "scope",
+    "operation_type",
+    "target",
+    "reason",
+    "evidence",
+    "risk_level",
+    "required_approvals",
+    "destructive",
+    "apply_allowed",
     "expected_identity",
     "repo",
     "apply_plan",
     "blocked_actions",
     "actions",
+    "blockers",
+    "warnings",
 ]
 
 
@@ -103,8 +116,22 @@ def _resolve_artifact_path(repo_root: Path, path: str | Path | None, default_rel
 def proposal_schema() -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
+        "version": SCHEMA_VERSION,
         "manifest_kind": MANIFEST_KIND,
         "required_fields": REQUIRED_FIELDS,
+        "audit_fields": {
+            "scope": "Bounded implementation/review scope for the proposal.",
+            "operation_type": "Proposal operation class; never an apply command.",
+            "target": "Repo-relative or logical target under review.",
+            "reason": "Human-auditable reason for generating the proposal.",
+            "evidence": "Explicit local evidence paths or claims supporting review.",
+            "risk_level": "Expected risk before review; destructive proposals are blocked.",
+            "required_approvals": "Approvals required before any future apply implementation.",
+            "destructive": "Must be false for v1.1 proposal manifests.",
+            "apply_allowed": "Must be false without reviewed approval.",
+            "blockers": "Structured blockers found while building or validating the proposal.",
+            "warnings": "Structured warnings found while building or validating the proposal.",
+        },
         "apply_plan": {
             "review_gated": True,
             "human_approval_required": True,
@@ -123,11 +150,26 @@ def build_default_manifest(repo_root: Path, title: str = "v1.1 reviewed apply pl
     now = _utc_now()
     return {
         "schema_version": SCHEMA_VERSION,
+        "version": SCHEMA_VERSION,
         "manifest_kind": MANIFEST_KIND,
         "proposal_id": f"proposal:{now}:{_slug(title)}",
         "title": title,
         "status": "draft",
         "created_at": now,
+        "scope": "v1.1 reviewed-action-layer local baseline",
+        "operation_type": "reviewed_apply_plan",
+        "target": "repository-local governance pipeline",
+        "reason": "Generate a deterministic, reviewable proposal artifact without executing apply behavior.",
+        "evidence": [
+            "docs/plans/v1.1-reviewed-action-layer.md",
+            "policies/approval-gates.yaml",
+            "src/graph_harness_maintain/proposals.py",
+            "src/graph_harness_maintain/pipeline.py",
+        ],
+        "risk_level": "low",
+        "required_approvals": ["human_review"],
+        "destructive": False,
+        "apply_allowed": False,
         "expected_identity": EXPECTED_IDENTITY,
         "repo": {
             "branch": _git(repo_root, "branch", "--show-current"),
@@ -148,6 +190,8 @@ def build_default_manifest(repo_root: Path, title: str = "v1.1 reviewed apply pl
         "blocked_actions": BLOCKED_ACTIONS,
         "allowed_local_actions": sorted(ALLOWED_LOCAL_ACTIONS),
         "actions": [],
+        "blockers": [],
+        "warnings": [],
         "notes": [
             "Proposal creation and validation are local artifact operations only.",
             "No apply execution command is provided in v1.1.",
@@ -167,6 +211,24 @@ def validate_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
         blockers.append("schema_version must be 1.1")
     if manifest.get("manifest_kind") != MANIFEST_KIND:
         blockers.append(f"manifest_kind must be {MANIFEST_KIND}")
+    if manifest.get("version") not in {SCHEMA_VERSION, None}:
+        blockers.append("version must be 1.1 when provided")
+
+    if manifest.get("destructive") is not False:
+        blockers.append("destructive must be false for v1.1 proposals")
+    if manifest.get("apply_allowed") is not False:
+        blockers.append("apply_allowed must be false without reviewed approval")
+
+    evidence = manifest.get("evidence")
+    if not isinstance(evidence, list) or not evidence or not all(isinstance(item, str) and item.strip() for item in evidence):
+        blockers.append("evidence must be a non-empty list of explicit audit strings")
+    required_approvals = manifest.get("required_approvals")
+    if not isinstance(required_approvals, list) or "human_review" not in required_approvals:
+        blockers.append("required_approvals must include human_review")
+    if not isinstance(manifest.get("blockers"), list):
+        blockers.append("blockers must be a list")
+    if not isinstance(manifest.get("warnings"), list):
+        blockers.append("warnings must be a list")
 
     apply_plan = manifest.get("apply_plan")
     if not isinstance(apply_plan, dict):
@@ -186,7 +248,7 @@ def validate_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
         blockers.append("provenance upgrade must remain gated")
 
     blocked_actions = set(manifest.get("blocked_actions") or [])
-    for required in sorted(REMOTE_PUBLICATION_ACTIONS | DESTRUCTIVE_ACTIONS | {"provenance_upgrade"}):
+    for required in sorted(REMOTE_PUBLICATION_ACTIONS | DESTRUCTIVE_ACTIONS | {"graph_mutation", "provenance_upgrade", "sensitive_export"}):
         if required not in blocked_actions:
             blockers.append(f"blocked_actions missing required gate: {required}")
 
@@ -219,8 +281,11 @@ def validate_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
         "generated_at": _utc_now(),
         "status": status,
         "schema_version": SCHEMA_VERSION,
+        "version": manifest.get("version"),
         "manifest_kind": manifest.get("manifest_kind"),
         "proposal_id": manifest.get("proposal_id"),
+        "apply_allowed": manifest.get("apply_allowed") is True,
+        "destructive": manifest.get("destructive") is True,
         "review_gated": apply_plan.get("review_gated") is True,
         "human_approval_required": apply_plan.get("human_approval_required") is True,
         "apply_executed": apply_plan.get("apply_executed") is True,

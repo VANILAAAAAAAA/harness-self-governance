@@ -12,6 +12,7 @@ NOT_EXECUTED = [
     "raw archive apply",
     "delete",
     "move",
+    "graph mutation",
     "graph/events mutation",
     "quarantine",
     "rehydrate",
@@ -193,8 +194,26 @@ leak scan status
 reviewed apply gated
 : {result.get('reviewed_apply_gated')}
 
+proposal only
+: {not result.get('apply_executed')}
+
+destructive operations allowed
+: {result.get('destructive_operations_allowed')}
+
 remote publication allowed
 : {result.get('remote_publication_allowed')}
+
+raw archive apply allowed
+: False
+
+delete/move/quarantine/rehydrate allowed
+: False
+
+graph mutation allowed
+: False
+
+sensitive export allowed
+: False
 
 provenance upgrade allowed
 : {result.get('provenance_upgrade_allowed')}
