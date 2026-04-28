@@ -61,7 +61,7 @@ def test_export_writes_repo_artifacts_to_expected_paths(tmp_path: Path) -> None:
     report = export_repo_projection(repo, memory_root)
 
     assert report["status"] == "PASS"
-    graph = json.loads((repo / "artifacts" / "v2" / "graph" / "governance-graph.json").read_text(encoding="utf-8"))
+    graph = json.loads((repo / "artifacts" / "v2" / "graph" / "agent-memory-graph.json").read_text(encoding="utf-8"))
     lineage = json.loads((repo / "artifacts" / "v2" / "lineage" / "log-index.json").read_text(encoding="utf-8"))
     project_summary = json.loads((repo / "artifacts" / "v2" / "projects" / "general" / "harness-self-governance" / "project-summary.json").read_text(encoding="utf-8"))
     assert graph["summary"]["global_agent_memory_graph_supported"] is True

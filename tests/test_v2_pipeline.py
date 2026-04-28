@@ -39,6 +39,7 @@ def test_v2_pipeline_reports_read_only_safety_boundary() -> None:
     assert data["sensitive_export_allowed"] is False
     assert data["session_raw_committed"] is False
     assert "artifacts/v2/graph/governance-graph.json" in data["artifacts"]
+    assert "artifacts/v2/graph/agent-memory-graph.json" in data["artifacts"]
     assert "artifacts/v2/dashboard/index.html" in data["artifacts"]
     assert "artifacts/v2/sessions/session-index.json" in data["artifacts"]
     assert "artifacts/v2/profiles/profile-index.json" in data["artifacts"]

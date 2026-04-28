@@ -21,7 +21,7 @@ def build_repo_manifest(profile_id: str, project_id: str) -> dict[str, Any]:
         "memory_graph": {
             "source": "global",
             "export_to": {
-                "graph": "artifacts/v2/graph/governance-graph.json",
+                "graph": "artifacts/v2/graph/agent-memory-graph.json",
                 "project": f"artifacts/v2/projects/{profile_id}/{project_id}/",
                 "lineage": "artifacts/v2/lineage/log-index.json",
             },

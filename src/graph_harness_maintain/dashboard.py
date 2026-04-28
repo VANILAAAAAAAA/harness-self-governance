@@ -320,7 +320,8 @@ def _ensure_dashboard_graph_context(graph: dict[str, Any]) -> dict[str, Any]:
 
 def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
     repo_root = Path(repo_root).resolve()
-    graph_path = repo_root / "artifacts" / "v2" / "graph" / "governance-graph.json"
+    governance_graph_path = repo_root / "artifacts" / "v2" / "graph" / "governance-graph.json"
+    memory_graph_path = repo_root / "artifacts" / "v2" / "graph" / "agent-memory-graph.json"
     profile_index_path = repo_root / "artifacts" / "v2" / "profiles" / "profile-index.json"
     project_manifest_path = repo_root / "artifacts" / "v2" / "projects" / DEFAULT_PROFILE_ID / DEFAULT_PROJECT_ID / "project-manifest.json"
     lineage_path = repo_root / "artifacts" / "v2" / "lineage" / "log-index.json"
@@ -328,19 +329,20 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         write_profile_index(repo_root)
     if not project_manifest_path.exists():
         init_project(repo_root, DEFAULT_PROFILE_ID, DEFAULT_PROJECT_ID)
-    if not graph_path.exists():
-        write_governance_graph(repo_root, graph_path)
+    if not governance_graph_path.exists():
+        write_governance_graph(repo_root, governance_graph_path)
     if not lineage_path.exists():
         write_lineage_index(repo_root)
     session_path = ensure_session_index(repo_root)
-    graph = _ensure_dashboard_graph_context(_load_json(graph_path))
+    governance_graph = _ensure_dashboard_graph_context(_load_json(governance_graph_path))
+    memory_graph = _ensure_dashboard_graph_context(_load_json(memory_graph_path)) if memory_graph_path.exists() else {"nodes": [], "edges": [], "summary": {"global_agent_memory_graph_supported": False}}
     sessions = _load_json(session_path)
     profile_index = _load_json(profile_index_path)
     lineage_index = _load_json(lineage_path)
     project_manifest = _load_json(project_manifest_path)
     project_summary = _load_json(repo_root / "artifacts" / "v2" / "projects" / DEFAULT_PROFILE_ID / DEFAULT_PROJECT_ID / "project-summary.json")
     pipeline = _load_json(repo_root / "artifacts" / "v2" / "pipeline-run.json")
-    inventory, inventory_warnings = collect_file_inventory(repo_root, graph)
+    inventory, inventory_warnings = collect_file_inventory(repo_root, governance_graph)
     safety = {
         "read_only_ui": True,
         "destructive_operations_allowed": False,
@@ -348,12 +350,20 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         "remote_publication_allowed": False,
         "sensitive_export_allowed": False,
     }
-    graph_summary = build_graph_summary(graph)
+    graph_summary = build_graph_summary(governance_graph)
+    memory_graph_summary = build_graph_summary(memory_graph)
+    graphs = {"governance": governance_graph, "memory": memory_graph}
+    graph_summaries = {"governance": graph_summary, "memory": memory_graph_summary}
+    graph_filter_catalog = {name: sorted({node.get("type", "unknown") for node in graph.get("nodes", [])}) for name, graph in graphs.items()}
+    edge_filter_catalog = {name: sorted({edge.get("relation") or edge.get("type", "unknown") for edge in graph.get("edges", [])}) for name, graph in graphs.items()}
     return {
         "schema_version": "2.0",
         "app": {"name": "Governance Hub", "version": "v2.0", "default_route": "#/graph"},
-        "graph": graph,
+        "graph": governance_graph,
         "graph_summary": graph_summary,
+        "graphs": graphs,
+        "graph_summaries": graph_summaries,
+        "default_graph_dataset": "governance",
         "sessions": sessions,
         "profile_index": profile_index,
         "projects": {"active_profile": DEFAULT_PROFILE_ID, "default_project": DEFAULT_PROJECT_ID, "manifests": [project_manifest] if project_manifest else [], "summaries": [project_summary] if project_summary else []},
@@ -363,8 +373,10 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         "artifact_inventory": [item["path"] for item in inventory if item["path"].startswith("artifacts/")],
         "file_inventory": inventory,
         "inventory_warnings": inventory_warnings,
-        "graph_filter_types": sorted({node.get("type", "unknown") for node in graph.get("nodes", [])}),
-        "edge_filter_types": sorted({edge.get("relation") or edge.get("type", "unknown") for edge in graph.get("edges", [])}),
+        "graph_filter_types": graph_filter_catalog["governance"],
+        "edge_filter_types": edge_filter_catalog["governance"],
+        "graph_filter_catalog": graph_filter_catalog,
+        "edge_filter_catalog": edge_filter_catalog,
         "log_groups": list(INVENTORY_ROOTS.keys()),
         "safety_boundary": safety,
     }
@@ -441,21 +453,26 @@ pre {{ margin:0; white-space:pre-wrap; overflow:auto; max-height:52vh; backgroun
 <header class="topbar"><div class="brand"><div class="logo">◆</div><span>Governance Hub</span><span class="badge">v2.0</span></div><div class="top-actions"><a class="btn" href="#/logs" id="top-logs-link">Logs</a><label class="profile-switcher" id="profile-switcher">Profile: <select id="profile-select" aria-label="Profile switcher">{profile_options}</select></label><button class="btn" id="theme-toggle" aria-label="Theme toggle visual only">☼</button></div></header>
 <div class="shell"><aside class="sidebar"><a class="nav-item active" data-nav="graph" href="#/graph"><span>◎</span>Graph</a><a class="nav-item" data-nav="logs" href="#/logs"><span>▤</span>Logs</a></aside>
 <main>
-<section class="route active content" data-route="graph" id="graph-route"><div class="page-head"><div><h1>Governance Graph</h1><div class="subtitle">Interactive view of tools, knowledge, policies, artifacts, proposals, sessions, and provenance.</div></div><div class="health-row"><div class="status-card"><small>System Health</small><strong class="ok">{status}</strong></div><div class="status-card"><small>Nodes</small><strong>{len(nodes)}</strong></div><div class="status-card"><small>Edges</small><strong>{len(edges)}</strong></div><div class="status-card"><small>Safety</small><strong class="warn">READ ONLY</strong></div></div></div>
-<div class="logic-flow" aria-label="Logic Flow"><strong>Logic Flow</strong><span>Profile</span><span class="arrow">→</span><span>Project</span><span class="arrow">→</span><span>Session Knowledge</span><span class="arrow">→</span><span>Graph Export</span><span class="arrow">→</span><span>Lineage Index</span><span class="arrow">→</span><span>Dashboard</span><span class="arrow">→</span><span>Logs</span></div>
-<div class="graph-workspace"><div class="graph-main"><div class="toolbar"><div class="toolbar-left"><label class="project-selector" id="project-selector">Project: <select id="project-select" aria-label="Project selector">{project_options}</select></label><input id="graph-search" class="search" placeholder="Search visible graph"><button class="btn" id="fit-view">Fit view</button><button class="btn" id="focus-hubs">Focus hubs</button><details class="filter-panel" id="filter-panel"><summary>Filters</summary><div class="type-filter-panel" id="type-filter-panel"><span class="subtitle">Node filters</span><span id="type-filter-chips"></span></div><div class="type-filter-panel"><span class="subtitle">Edge filters</span><span id="edge-filter-chips"></span><button class="btn" id="clear-edge-filters">All edges</button><button class="btn" id="clear-graph-filters">Clear filters</button></div></details></div><div class="legend" id="graph-legend"></div><span class="count-pill" id="visible-node-count">0 visible nodes</span></div><div class="mode-switch" aria-label="Graph view mode"><button class="btn mode-btn" data-graph-mode="overview" aria-pressed="true" title="Curated 10-25 high-value nodes">Overview · curated</button><button class="btn mode-btn" data-graph-mode="focus" aria-pressed="false" title="Selected node plus immediate neighbors">Focus · 1-hop</button><button class="btn mode-btn" data-graph-mode="full" aria-pressed="false" title="All nodes and edges for debugging">Full graph</button><span class="subtitle" id="mode-help">Overview = curated system map. Focus = selected item plus 1-hop neighbors. Full graph = debug/all nodes.</span></div><div class="graph-canvas-wrap" id="graph-wrap"><svg id="graph-canvas" role="img" aria-label="Governance Graph"><defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#a8b2c7"></path></marker></defs><g id="viewport"><g id="edge-layer"></g><g id="node-layer"></g></g></svg><div class="float-controls"><button id="zoom-in">+</button><button id="zoom-out">−</button><button id="zoom-reset">⌂</button><button title="Read-only lock">🔒</button></div><div class="minimap" id="minimap"></div></div><div class="graph-hint">ⓘ Drag nodes to reposition · Click nodes or edges to inspect · Edge filters reduce dense views · Scroll to zoom · Double-click empty space to reset view</div></div><aside class="inspector"><div class="tabs" role="tablist" aria-label="Inspector views"><button class="tab active" role="tab" data-inspector-tab="inspect" aria-selected="true">Inspect</button><button class="tab" role="tab" data-inspector-tab="edge" aria-selected="false" id="edge-inspector">Edge</button><button class="tab" role="tab" data-inspector-tab="summary" aria-selected="false">Summary</button></div><h2 id="node-inspector">Graph diagnostic summary</h2><div class="kv" id="inspector-body"></div><a class="btn logs-link" href="#/logs" id="view-in-logs">View in Logs →</a><div class="mapping-note" id="log-mapping-note">Log mapping uses exact indexed local artifact paths only.</div></aside></div>
+<section class="route active content" data-route="graph" id="graph-route"><div class="page-head"><div><h1 id="graph-title">Governance Graph</h1><div class="subtitle" id="graph-subtitle">Interactive view of tools, knowledge, policies, artifacts, proposals, sessions, and provenance.</div></div><div class="health-row"><div class="status-card"><small>System Health</small><strong class="ok">{status}</strong></div><div class="status-card"><small>Nodes</small><strong id="graph-node-total">{len(nodes)}</strong></div><div class="status-card"><small>Edges</small><strong id="graph-edge-total">{len(edges)}</strong></div><div class="status-card"><small>Safety</small><strong class="warn">READ ONLY</strong></div></div></div>
+<div class="logic-flow" aria-label="Logic Flow"><strong>Logic Flow</strong><span>Profile</span><span class="arrow">→</span><span>Project</span><span class="arrow">→</span><span>Session Knowledge</span><span class="arrow">→</span><span>Governance Graph</span><span class="arrow">→</span><span>Agent Memory Graph</span><span class="arrow">→</span><span>Dashboard</span><span class="arrow">→</span><span>Logs</span></div>
+<div class="graph-workspace"><div class="graph-main"><div class="toolbar"><div class="toolbar-left"><label class="project-selector" id="project-selector">Project: <select id="project-select" aria-label="Project selector">{project_options}</select></label><input id="graph-search" class="search" placeholder="Search visible graph"><button class="btn" id="fit-view">Fit view</button><button class="btn" id="focus-hubs">Focus hubs</button><details class="filter-panel" id="filter-panel"><summary>Filters</summary><div class="type-filter-panel" id="type-filter-panel"><span class="subtitle">Node filters</span><span id="type-filter-chips"></span></div><div class="type-filter-panel"><span class="subtitle">Edge filters</span><span id="edge-filter-chips"></span><button class="btn" id="clear-edge-filters">All edges</button><button class="btn" id="clear-graph-filters">Clear filters</button></div></details></div><div class="legend" id="graph-legend"></div><span class="count-pill" id="visible-node-count">0 visible nodes</span></div><div class="mode-switch" aria-label="Graph dataset mode"><strong>Graph mode</strong><button class="btn mode-btn" data-graph-dataset="governance" aria-pressed="true">Governance (default)</button><button class="btn mode-btn" data-graph-dataset="memory" aria-pressed="false">Memory</button><span class="subtitle" id="graph-dataset-help">Governance = repo-wide asset graph. Memory = agent context/protocol graph.</span></div><div class="mode-switch" aria-label="Graph view mode"><button class="btn mode-btn" data-graph-mode="overview" aria-pressed="true" title="Curated 10-25 high-value nodes">Overview · curated</button><button class="btn mode-btn" data-graph-mode="focus" aria-pressed="false" title="Selected node plus immediate neighbors">Focus · 1-hop</button><button class="btn mode-btn" data-graph-mode="full" aria-pressed="false" title="All nodes and edges for debugging">Full graph</button><span class="subtitle" id="mode-help">Overview = curated system map. Focus = selected item plus 1-hop neighbors. Full graph = debug/all nodes.</span></div><div class="graph-canvas-wrap" id="graph-wrap"><svg id="graph-canvas" role="img" aria-label="Governance Graph"><defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#a8b2c7"></path></marker></defs><g id="viewport"><g id="edge-layer"></g><g id="node-layer"></g></g></svg><div class="float-controls"><button id="zoom-in">+</button><button id="zoom-out">−</button><button id="zoom-reset">⌂</button><button title="Read-only lock">🔒</button></div><div class="minimap" id="minimap"></div></div><div class="graph-hint">ⓘ Drag nodes to reposition · Click nodes or edges to inspect · Edge filters reduce dense views · Scroll to zoom · Double-click empty space to reset view</div></div><aside class="inspector"><div class="tabs" role="tablist" aria-label="Inspector views"><button class="tab active" role="tab" data-inspector-tab="inspect" aria-selected="true">Inspect</button><button class="tab" role="tab" data-inspector-tab="edge" aria-selected="false" id="edge-inspector">Edge</button><button class="tab" role="tab" data-inspector-tab="summary" aria-selected="false">Summary</button></div><h2 id="node-inspector">Graph diagnostic summary</h2><div class="kv" id="inspector-body"></div><a class="btn logs-link" href="#/logs" id="view-in-logs">View in Logs →</a><div class="mapping-note" id="log-mapping-note">Log mapping uses exact indexed local artifact paths only.</div></aside></div>
 </section>
 <section class="route content" data-route="logs" id="logs-route"><div class="page-head"><div><h1>Logs</h1><div class="subtitle">Browse and inspect raw local artifacts, metadata, and lineage. No actions execute from this page.</div></div><div class="top-actions"><a class="btn primary" href="#/graph">Graph</a><span class="badge">READ ONLY</span></div></div><div class="logs-scroll-hint"><span>Use the File Explorer, Table, and Preview scrollbars for lower content</span><span>No browser page scroll</span></div><div class="logs-layout"><aside class="explorer"><div class="pane-head"><strong>File Explorer</strong><span class="badge" id="explorer-count">0 items</span></div><ul class="tree" id="file-tree"></ul></aside><section class="file-table"><div class="pane-head"><div><strong id="folder-title">artifacts/</strong> <span class="badge" id="table-count">0 items</span></div><div><input id="file-search" class="search" placeholder="Search files and folders"><div class="scroll-actions"><button class="scroll-btn" id="table-scroll-up">↑ table</button><button class="scroll-btn" id="table-scroll-down">↓ table</button></div></div></div><div class="file-table-scroll" id="file-table-scroll"><table><thead><tr><th>Name / Path</th><th>Type</th><th>Size</th><th>Modified</th><th>Level/Status</th></tr></thead><tbody id="file-rows"></tbody></table></div></section><aside class="preview-panel" id="preview-panel"><div class="file-title"><div><h2 id="preview-title">Select a file</h2><div class="subtitle" id="preview-subtitle">Preview, Raw, Metadata, and Lineage</div></div><button class="btn" id="copy-path">Copy path</button></div><div class="preview-tabs"><button class="active" data-preview-tab="preview">Preview</button><button data-preview-tab="raw">Raw</button><button data-preview-tab="metadata">Metadata</button><button data-preview-tab="lineage">Lineage</button></div><div class="preview-toolbar"><button class="scroll-btn" id="preview-scroll-up">↑ preview</button><button class="scroll-btn" id="preview-scroll-down">↓ preview</button></div><pre id="preview-code">No file selected.</pre><section><h3>Lineage</h3><div class="lineage-flow" id="lineage-flow"></div></section></aside></div></section>
 </main></div>
 <script id="governance-data" type="application/json">{payload}</script>
 <script>
 const DATA = JSON.parse(document.getElementById('governance-data').textContent);
+DATA.graphs = DATA.graphs || {{governance: DATA.graph}};
+DATA.graph_summaries = DATA.graph_summaries || {{governance: DATA.graph_summary}};
+DATA.graph_filter_catalog = DATA.graph_filter_catalog || {{governance: DATA.graph_filter_types || []}};
+DATA.edge_filter_catalog = DATA.edge_filter_catalog || {{governance: DATA.edge_filter_types || []}};
 const colorMap = {{profile:['#ecfeff','#0891b2'], project:['#f0fdf4','#16a34a'], project_summary:['#f5f3ff','#7c3aed'], constraint:['#fee2e2','#dc2626'], tool:['#dbeafe','#2f6fed'], knowledge_source:['#dcfce7','#16a34a'], session:['#ede9fe','#7c3aed'], policy:['#fee2e2','#dc2626'], gate:['#fee2e2','#dc2626'], artifact:['#fef3c7','#d97706'], report:['#fef3c7','#d97706'], proposal:['#cffafe','#0891b2'], provenance_state:['#e0e7ff','#4f46e5'], decision:['#ffe4e6','#e11d48'], requirement:['#f1f5f9','#475569'], pipeline_run:['#f8fafc','#475569'], adapter:['#dbeafe','#2f6fed'], test_result:['#dcfce7','#16a34a'], release_audit:['#fef3c7','#d97706']}};
 let panZoomState = {{x: 20, y: 20, scale: 1}};
 let positions = {{}};
 let selectedFile = null;
-let activeGraphTypes = new Set(DATA.graph_filter_types || []);
-let activeEdgeTypes = new Set(DATA.edge_filter_types || []);
+let activeGraphDataset = DATA.default_graph_dataset || 'governance';
+let activeGraphTypes = new Set();
+let activeEdgeTypes = new Set();
 let activeLogGroup = 'artifacts';
 let currentFileRows = [];
 let isCanvasPanning = false;
@@ -466,6 +483,31 @@ let focusNodeId = null;
 let activeInspectorTab = 'summary';
 let activeProfile = (DATA.profile_index && DATA.profile_index.active_profile) || 'general';
 let activeProject = (DATA.projects && DATA.projects.default_project) || 'harness-self-governance';
+function currentGraphLabel() {{ return activeGraphDataset === 'memory' ? 'Agent Memory Graph' : 'Governance Graph'; }}
+function currentGraphSubtitle() {{ return activeGraphDataset === 'memory' ? 'Graph-governed context/protocol view for profile, project, decisions, requirements, constraints, and archived session summaries.' : 'Interactive view of tools, knowledge, policies, artifacts, proposals, sessions, and provenance.'; }}
+function applyGraphDataset(dataset) {{
+    activeGraphDataset = (DATA.graphs && DATA.graphs[dataset]) ? dataset : 'governance';
+    DATA.graph = DATA.graphs[activeGraphDataset] || {{nodes:[],edges:[]}};
+    DATA.graph_summary = (DATA.graph_summaries && DATA.graph_summaries[activeGraphDataset]) || {{node_count:0,edge_count:0,density:'0.000',diagnostics:['No graph loaded'],hubs:[]}};
+    DATA.graph_filter_types = (DATA.graph_filter_catalog && DATA.graph_filter_catalog[activeGraphDataset]) || [];
+    DATA.edge_filter_types = (DATA.edge_filter_catalog && DATA.edge_filter_catalog[activeGraphDataset]) || [];
+    activeGraphTypes = new Set(DATA.graph_filter_types || []);
+    activeEdgeTypes = new Set(DATA.edge_filter_types || []);
+    positions = {{}};
+    focusNodeId = null;
+    selectedGraphRef = null;
+    document.querySelectorAll('[data-graph-dataset]').forEach(btn => btn.setAttribute('aria-pressed', String(btn.dataset.graphDataset === activeGraphDataset)));
+    const title = document.getElementById('graph-title');
+    if (title) title.textContent = currentGraphLabel();
+    const subtitle = document.getElementById('graph-subtitle');
+    if (subtitle) subtitle.textContent = currentGraphSubtitle();
+    const help = document.getElementById('graph-dataset-help');
+    if (help) help.textContent = activeGraphDataset === 'memory' ? 'Memory = agent context/protocol graph. Governance stays available for repo-wide evidence navigation.' : 'Governance = repo-wide asset graph. Memory = agent context/protocol graph.';
+    const nodeTotal = document.getElementById('graph-node-total');
+    if (nodeTotal) nodeTotal.textContent = String((DATA.graph.nodes || []).length);
+    const edgeTotal = document.getElementById('graph-edge-total');
+    if (edgeTotal) edgeTotal.textContent = String((DATA.graph.edges || []).length);
+}}
 function nodeProfile(n) {{ return (n.metadata&&n.metadata.profile_id) || (n.id||'').split(':')[1] || 'general'; }}
 function nodeProject(n) {{ return (n.metadata&&n.metadata.project_id) || ((n.id||'').includes('harness-self-governance') ? 'harness-self-governance' : ''); }}
 function scopeAllowsNode(n) {{ if(activeProfile==='ehrlab') return nodeProfile(n)==='ehrlab'; if(nodeProfile(n)==='ehrlab') return false; const project=nodeProject(n); return !project || project===activeProject || ['policy','gate','pipeline_run','artifact','report','tool','knowledge_source','provenance_state','test_result','release_audit'].includes(n.type); }}
@@ -522,7 +564,7 @@ graphCanvas.addEventListener('contextmenu', ev => ev.preventDefault());
 document.getElementById('zoom-in').onclick=()=>{{panZoomState.scale+=.15; applyZoom();}}; document.getElementById('zoom-out').onclick=()=>{{panZoomState.scale=Math.max(.35,panZoomState.scale-.15); applyZoom();}}; document.getElementById('zoom-reset').onclick=document.getElementById('fit-view').onclick=()=>{{panZoomState={{x:20,y:20,scale:1}}; applyZoom();}};
 document.querySelectorAll('[data-inspector-tab]').forEach(btn=>btn.onclick=()=>setInspectorTab(btn.dataset.inspectorTab));
 function setGraphMode(mode) {{ activeGraphMode=mode; document.querySelectorAll('[data-graph-mode]').forEach(btn=>btn.setAttribute('aria-pressed', String(btn.dataset.graphMode===mode))); if(mode==='focus' && !focusNodeId) {{ const hub=(DATA.graph_summary.hubs||[])[0]; focusNodeId=hub && hub.id; }} renderGraph(); }}
-document.querySelectorAll('[data-graph-mode]').forEach(btn=>btn.onclick=()=>setGraphMode(btn.dataset.graphMode)); document.getElementById('graph-search').addEventListener('input', renderGraph); document.getElementById('clear-graph-filters').onclick=clearGraphFilters; document.getElementById('clear-edge-filters').onclick=()=>{{activeEdgeTypes=new Set(DATA.edge_filter_types || []); renderEdgeFilters(); renderGraph();}}; document.getElementById('focus-hubs').onclick=()=>{{const hub=(DATA.graph_summary.hubs||[])[0]; if(hub) {{ focusNodeId=hub.id; setGraphMode('focus'); selectHub(hub.id); }} }}; document.getElementById('view-in-logs').onclick=(ev)=>{{ev.preventDefault(); if(ev.currentTarget.getAttribute('aria-disabled')==='true') return; viewSelectedGraphInLogs();}};
+document.querySelectorAll('[data-graph-mode]').forEach(btn=>btn.onclick=()=>setGraphMode(btn.dataset.graphMode)); document.querySelectorAll('[data-graph-dataset]').forEach(btn=>btn.onclick=()=>{{ applyGraphDataset(btn.dataset.graphDataset); renderLegend(); renderTypeFilters(); renderEdgeFilters(); renderGraph(); renderGraphSummary(true); updateViewInLogsControl(); }}); document.getElementById('graph-search').addEventListener('input', renderGraph); document.getElementById('clear-graph-filters').onclick=clearGraphFilters; document.getElementById('clear-edge-filters').onclick=()=>{{activeEdgeTypes=new Set(DATA.edge_filter_types || []); renderEdgeFilters(); renderGraph();}}; document.getElementById('focus-hubs').onclick=()=>{{const hub=(DATA.graph_summary.hubs||[])[0]; if(hub) {{ focusNodeId=hub.id; setGraphMode('focus'); selectHub(hub.id); }} }}; document.getElementById('view-in-logs').onclick=(ev)=>{{ev.preventDefault(); if(ev.currentTarget.getAttribute('aria-disabled')==='true') return; viewSelectedGraphInLogs();}};
 function renderMinimap(ids) {{ const mini=document.getElementById('minimap'); mini.innerHTML=''; Object.entries(positions).filter(([id]) => !ids || ids.has(id)).slice(0,80).forEach(([id,p]) => {{ const node=DATA.graph.nodes.find(n=>n.id===id)||{{type:'requirement'}}; const d=document.createElement('i'); d.className='mini-node'; d.style.left=(8+(p.x%120))+'px'; d.style.top=(10+(p.y%60))+'px'; d.style.background=(colorMap[node.type]||colorMap.requirement)[1]; mini.appendChild(d); }}); }}
 function selectLogGroup(group, keepSelection=false) {{ activeLogGroup = group; if(!keepSelection) selectedFile = null; document.querySelectorAll('[data-log-group]').forEach(el => el.classList.toggle('active', el.dataset.logGroup === group)); document.getElementById('folder-title').textContent = group + '/'; renderFiles(); }}
 function locateLogPath(path) {{ if(!path) return false; let file=DATA.file_inventory.find(f=>f.path===path); if(!file) return false; selectedFile=file; activeLogGroup=file.group || (file.groups||[])[0] || 'artifacts'; location.hash='#/logs'; route(); selectLogGroup(activeLogGroup, true); selectFile(file.path); setTimeout(()=>{{ const row=document.querySelector(`#file-rows tr[data-path="${{CSS.escape(file.path)}}"]`); if(row) row.scrollIntoView({{block:'center'}}); }}, 0); return true; }}
@@ -540,6 +582,7 @@ document.getElementById('profile-select').addEventListener('change', setGraphSco
 function toggleTheme() {{ document.body.classList.toggle('dark'); document.getElementById('theme-toggle').textContent = document.body.classList.contains('dark') ? '☾' : '☼'; }}
 document.getElementById('theme-toggle').onclick=toggleTheme;
 function renderLineage() {{ const flow=document.getElementById('lineage-flow'); const line=selectedFile.lineage || []; flow.innerHTML = line.length ? line.slice(0,4).map(l=>`<div class="lineage-node"><strong>${{l.source}}</strong><br><span>${{l.relation}} →</span><br>${{l.target}}</div>`).join('') : '<span class="subtitle">No lineage edges found.</span>'; }}
+applyGraphDataset(activeGraphDataset);
 renderLegend(); renderTypeFilters(); renderEdgeFilters(); setGraphMode('overview'); renderTree(); renderFiles(); renderGraphSummary(true); updateViewInLogsControl();
 </script>
 </body>

@@ -29,6 +29,11 @@ def test_dashboard_file_generated_as_two_page_graph_logs_app() -> None:
         "data-route=\"graph\"",
         "data-route=\"logs\"",
         "Governance Graph",
+        "Agent Memory Graph",
+        "Governance (default)",
+        "Memory",
+        "data-graph-dataset=\"governance\"",
+        "data-graph-dataset=\"memory\"",
         "Logs",
         "System Health",
         "READ ONLY",
@@ -85,6 +90,9 @@ def test_dashboard_file_generated_as_two_page_graph_logs_app() -> None:
         "No projects archived for this profile yet",
         "Graph diagnostic summary",
         "graph_summary",
+        "graphs",
+        "graph_summaries",
+        "agent-memory-graph.json",
         "Traversal hubs",
         "focus-hubs",
         "data-graph-mode=\"overview\"",
@@ -142,6 +150,8 @@ def test_dashboard_embeds_graph_logs_sessions_and_safety_data() -> None:
 
     assert data["graph"]["nodes"]
     assert data["graph"]["edges"]
+    assert data["graphs"]["governance"]["nodes"]
+    assert "memory" in data["graphs"]
     assert "sessions" in data
     assert data["safety_boundary"] == {
         "read_only_ui": True,
@@ -153,9 +163,12 @@ def test_dashboard_embeds_graph_logs_sessions_and_safety_data() -> None:
     assert "file_inventory" in data
     assert any(item["group"] in {"artifacts", "policies", "proposals", "provenance", "system"} for item in data["file_inventory"])
     assert "governance-graph.json" in html
+    assert "agent-memory-graph.json" in html
     assert "session-index.json" in html
     assert data["graph_filter_types"]
     assert data["edge_filter_types"]
+    assert "governance" in data["graph_filter_catalog"]
+    assert "memory" in data["graph_filter_catalog"]
     assert data["graph_summary"]["node_count"] == len(data["graph"]["nodes"])
     assert data["graph_summary"]["edge_count"] == len(data["graph"]["edges"])
     assert data["graph_summary"]["diagnostics"]

@@ -107,8 +107,8 @@ def validate_repo(repo_root: Path | str, memory_root: Path | str | None = None) 
     graph_path = repo_root / str(export_to.get("graph", ""))
     project_export_root = repo_root / str(export_to.get("project", ""))
     lineage_path = repo_root / str(export_to.get("lineage", ""))
-    if graph_path.name != "governance-graph.json":
-        blockers.append("graph export path must end with governance-graph.json")
+    if graph_path.name != "agent-memory-graph.json":
+        blockers.append("graph export path must end with agent-memory-graph.json")
     if lineage_path.name != "log-index.json":
         blockers.append("lineage export path must end with log-index.json")
     if not str(project_export_root).endswith(f"artifacts/v2/projects/{profile_id}/{project_id}"):

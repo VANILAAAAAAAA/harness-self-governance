@@ -6,7 +6,7 @@
   "memory_graph": {
     "source": "global",
     "export_to": {
-      "graph": "artifacts/v2/graph/governance-graph.json",
+      "graph": "artifacts/v2/graph/agent-memory-graph.json",
       "project": "artifacts/v2/projects/general/harness-self-governance/",
       "lineage": "artifacts/v2/lineage/log-index.json"
     }

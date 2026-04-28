@@ -121,11 +121,12 @@ agent-graph export --repo . --memory-root <path>
 This projects global memory artifacts into repo-local paths:
 
 - `artifacts/v2/projects/general/harness-self-governance/`
+- `artifacts/v2/graph/agent-memory-graph.json`
 - `artifacts/v2/graph/governance-graph.json`
 - `artifacts/v2/lineage/log-index.json`
 - `artifacts/v2/profiles/profile-index.json`
 
-The dashboard reads those repo-local exports; it does not read `~/.agent-memory-graph/` directly in CI.
+The dashboard reads those repo-local exports. Governance Graph remains the repo-wide exploration/evidence graph, while Agent Memory Graph remains the context/protocol graph. The dashboard does not read `~/.agent-memory-graph/` directly in CI.
 
 ## Future repo adoption
 

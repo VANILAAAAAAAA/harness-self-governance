@@ -199,3 +199,9 @@ MIT. See [LICENSE](LICENSE).
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## v2.0 dual-graph architecture
+
+- `artifacts/v2/graph/governance-graph.json`: repo-wide Governance Graph for dashboard exploration and evidence navigation
+- `artifacts/v2/graph/agent-memory-graph.json`: Agent Memory Graph for graph-governed context loading
+- Dashboard Graph page defaults to Governance mode and can switch to Memory mode

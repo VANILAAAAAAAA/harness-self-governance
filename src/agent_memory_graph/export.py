@@ -173,6 +173,7 @@ def export_repo_projection(repo_root: Path | str, memory_root: Path | str) -> di
         'profile': profile_id,
         'project': project_id,
         'project_export_root': relpath(project_export_root, repo_root),
+        'memory_graph_path': relpath(graph_path, repo_root),
         'graph_path': relpath(graph_path, repo_root),
         'lineage_path': relpath(lineage_path, repo_root),
         'profile_index_path': relpath(profile_index_path, repo_root),

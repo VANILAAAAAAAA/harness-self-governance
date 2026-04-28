@@ -51,3 +51,10 @@ This phase is local-only:
 - no external CDN
 - no graph mutation execution
 - no destructive apply flow
+
+## Dual graph architecture
+
+- `artifacts/v2/graph/governance-graph.json` is the repo-wide Governance Graph for dashboard exploration, observability, and evidence navigation.
+- `artifacts/v2/graph/agent-memory-graph.json` is the Agent Memory Graph for graph-governed context loading and protocol routing.
+- The dashboard defaults to Governance mode and offers a separate Memory mode.
+- The two graphs stay separate; they are not flattened into one dataset.
