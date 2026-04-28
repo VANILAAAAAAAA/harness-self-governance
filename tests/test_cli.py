@@ -40,7 +40,7 @@ def test_ghm_help_command():
 
 
 def test_ghm_identity_check():
-    r = _run('identity-check')
+    r = _run('identity-check', '--ci')
     assert r.returncode == 0
     data = json.loads(r.stdout)
     assert data['status'] in {'PASS', 'PASS_WITH_WARNINGS'}
@@ -54,7 +54,7 @@ def test_ghm_check_gates():
 
 
 def test_ghm_locate_evidence():
-    _run('pipeline', 'local-rc')
+    _run('pipeline', 'local-rc', '--ci')
     r = _run('locate-evidence')
     assert r.returncode == 0
     data = json.loads(r.stdout)
@@ -62,14 +62,14 @@ def test_ghm_locate_evidence():
 
 
 def test_ghm_provenance_current_state():
-    r = _run('provenance', 'current-state')
+    r = _run('provenance', 'current-state', '--ci')
     assert r.returncode == 0
     data = json.loads(r.stdout)
     assert data['pipeline'] == 'local-rc'
 
 
 def test_ghm_pipeline_local_rc():
-    r = _run('pipeline', 'local-rc')
+    r = _run('pipeline', 'local-rc', '--ci')
     assert r.returncode == 0, r.stderr
     data = json.loads(r.stdout)
     assert data['status'] in {'PASS', 'PASS_WITH_WARNINGS'}
