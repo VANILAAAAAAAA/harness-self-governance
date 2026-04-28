@@ -14,7 +14,7 @@ from .gates import write_gate_check
 from .dashboard import build_dashboard
 from .git_state import write_git_state
 from .graph_export import write_governance_graph
-from .identity import IDENTITY_FAIL_EXIT_CODE, run_identity_check
+from .identity import GITHUB_ACTIONS_BOT, IDENTITY_FAIL_EXIT_CODE, collect_identity_data, run_identity_check
 from .leak_scan import LEAK_SCAN_FAIL_EXIT_CODE, write_leak_scan
 from .lineage_index import validate_lineage_index, write_lineage_index
 from .profiles import validate_profile_index, write_profile_index
@@ -261,7 +261,7 @@ def run_v1_1_rc(repo_root: Path, strict: bool = False, ci_mode: bool = False, st
     adapter = write_adapter_report(repo_root, artifacts_root / "adapter-report.json", artifacts_root / "adapter-report.md")
     provenance_append = append_local_test_event(repo_root, provenance_root / "local-test-events.jsonl", provenance_root / "local-append-report.json", note="v1.1 RC local provenance append test")
     tests = run_tests(repo_root, artifacts_root / "test-results.json")
-    smoke = run_smoke_tests(repo_root, artifacts_root / "smoke-tests.json")
+    smoke = run_smoke_tests(repo_root, artifacts_root / "smoke-tests.json", ci_mode=ci_mode)
     leak_scan = write_leak_scan(repo_root, artifacts_root / "leak-scan.json")
 
     stage_results = {
@@ -408,12 +408,27 @@ def _raw_sessions_committed(repo_root: Path) -> bool:
     return bool(result.get("stdout_tail", "").strip())
 
 
+def _v2_nested_ci_mode(repo_root: Path) -> bool:
+    """Run nested v1/v1.1 gates in CI identity mode only for GitHub Actions bot runs.
+
+    The v2 dashboard pipeline is read-only and commonly runs inside GitHub Actions,
+    where git author/committer identity is the Actions bot.  Keep local identity
+    gates strict for ordinary developer identities, but avoid turning the allowed
+    CI bot identity into a blocker for this read-only v2 aggregation pipeline.
+    """
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        return True
+    identity = collect_identity_data(repo_root)
+    return GITHUB_ACTIONS_BOT in (identity.get("author_ident") or "") and GITHUB_ACTIONS_BOT in (identity.get("committer_ident") or "")
+
+
 def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
     repo_root = repo_root.resolve()
     artifacts_root = repo_root / "artifacts" / "v2"
 
-    local = run_local_rc(repo_root, strict=False, ci_mode=False)
-    proposal = run_v1_1_rc(repo_root, strict=False, ci_mode=False)
+    nested_ci_mode = _v2_nested_ci_mode(repo_root)
+    local = run_local_rc(repo_root, strict=False, ci_mode=nested_ci_mode)
+    proposal = run_v1_1_rc(repo_root, strict=False, ci_mode=nested_ci_mode)
     raw_dir = repo_root / "sessions" / "raw"
     sessions = compress_sessions(repo_root, raw_dir, artifacts_root / "sessions")
     profile_index = write_profile_index(repo_root)
