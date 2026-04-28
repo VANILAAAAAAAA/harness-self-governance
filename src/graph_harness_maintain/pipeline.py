@@ -11,9 +11,12 @@ from .adapters import ArtifactStoreAdapter, FileTreeAdapter, GitRepoAdapter
 from .adapter_report import write_adapter_report
 from .evidence import write_evidence_index
 from .gates import write_gate_check
+from .dashboard import build_dashboard
 from .git_state import write_git_state
+from .graph_export import write_governance_graph
 from .identity import IDENTITY_FAIL_EXIT_CODE, run_identity_check
 from .leak_scan import LEAK_SCAN_FAIL_EXIT_CODE, write_leak_scan
+from .sessions import compress_sessions, ensure_session_index
 from .proposals import validate_proposal_file, write_default_proposal
 from .provenance import append_local_test_event, build_current_state, write_current_state
 from .release_audit import write_release_audit
@@ -393,5 +396,71 @@ def run_v1_1_rc(repo_root: Path, strict: bool = False, ci_mode: bool = False, st
         "strict": strict,
     }
     write_v1_1_pipeline_report(repo_root, artifacts_root / "v1.1-rc-report.md", result, git_state, identity, release_audit, gates, proposal, proposal_validation, templates, adapter, provenance_append, provenance, evidence, tests, smoke, leak_scan)
+    _write_json(artifacts_root / "pipeline-run.json", result)
+    return result
+
+
+def _raw_sessions_committed(repo_root: Path) -> bool:
+    result = _run_command(["git", "ls-files", "sessions/raw", "sessions/private"], repo_root)
+    return bool(result.get("stdout_tail", "").strip())
+
+
+def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
+    repo_root = repo_root.resolve()
+    artifacts_root = repo_root / "artifacts" / "v2"
+
+    local = run_local_rc(repo_root, strict=False, ci_mode=False)
+    proposal = run_v1_1_rc(repo_root, strict=False, ci_mode=False)
+    raw_dir = repo_root / "sessions" / "raw"
+    sessions = compress_sessions(repo_root, raw_dir, artifacts_root / "sessions")
+    graph = write_governance_graph(repo_root, artifacts_root / "graph" / "governance-graph.json")
+    dashboard = build_dashboard(repo_root, artifacts_root / "dashboard" / "index.html")
+    session_raw_committed = _raw_sessions_committed(repo_root)
+
+    stages = {
+        "local_rc": local,
+        "v1_1_rc": proposal,
+        "sessions": sessions,
+        "graph": graph,
+        "dashboard": dashboard,
+    }
+    if stage_overrides:
+        for name, override in stage_overrides.items():
+            stages.setdefault(name, {}).update(override)
+
+    blockers: list[str] = []
+    warnings: list[str] = []
+    for name, stage in stages.items():
+        if stage.get("status") == "FAIL":
+            blockers.extend(stage.get("blockers") or [f"{name} failed"])
+        warnings.extend(stage.get("warnings", []))
+    if session_raw_committed:
+        blockers.append("raw session files are tracked by git")
+
+    status = "PASS" if not blockers else "FAIL"
+
+    result = {
+        "generated_at": _utc_now(),
+        "schema_version": "2.0",
+        "status": status,
+        "release_ready_local": not blockers,
+        "read_only_ui": True,
+        "proposal_only": True,
+        "destructive_operations_allowed": False,
+        "graph_mutation_allowed": False,
+        "remote_publication_allowed": False,
+        "sensitive_export_allowed": False,
+        "session_raw_committed": session_raw_committed,
+        "blockers": blockers,
+        "warnings": warnings,
+        "stages": stages,
+        "artifacts": [
+            "artifacts/v2/graph/governance-graph.json",
+            "artifacts/v2/dashboard/index.html",
+            "artifacts/v2/sessions/session-index.json",
+            "artifacts/v2/pipeline-run.json",
+        ],
+        "exit_code": PASS if not blockers else FAIL,
+    }
     _write_json(artifacts_root / "pipeline-run.json", result)
     return result

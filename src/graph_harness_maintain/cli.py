@@ -11,9 +11,12 @@ from .adapter_report import write_adapter_report
 from .evidence import write_evidence_index
 from .gates import check_action_allowed, ensure_policy_file, load_policy, write_gate_check
 from .identity import run_identity_check
-from .pipeline import run_local_rc, run_v1_1_rc
+from .dashboard import build_dashboard
+from .graph_export import write_governance_graph
+from .pipeline import run_local_rc, run_v1_1_rc, run_v2_0_rc
 from .policy import Policy
 from .proposals import validate_proposal_file, write_default_proposal
+from .sessions import compress_sessions
 from .provenance import append_local_test_event, build_current_state, write_current_state
 from .release_audit import write_release_audit
 from .store import GraphStore
@@ -96,6 +99,23 @@ def build_parser() -> argparse.ArgumentParser:
     v1_1_rc = pipeline_sub.add_parser("v1.1-rc", help="Run v1.1 reviewed-action local RC pipeline")
     v1_1_rc.add_argument("--strict", action="store_true")
     v1_1_rc.add_argument("--ci", action="store_true")
+    pipeline_sub.add_parser("v2.0-rc", help="Run v2.0 read-only graph dashboard local RC pipeline")
+
+    graph = sub.add_parser("graph", help="Read-only governance graph commands")
+    graph_sub = graph.add_subparsers(dest="graph_cmd", required=True)
+    p = graph_sub.add_parser("export", help="Export deterministic v2 governance graph JSON")
+    p.add_argument("--out", default=None)
+
+    dashboard = sub.add_parser("dashboard", help="Static read-only dashboard commands")
+    dashboard_sub = dashboard.add_subparsers(dest="dashboard_cmd", required=True)
+    p = dashboard_sub.add_parser("build", help="Build the local static v2 dashboard")
+    p.add_argument("--out", default=None)
+
+    sessions = sub.add_parser("sessions", help="Local-only session compression commands")
+    sessions_sub = sessions.add_subparsers(dest="sessions_cmd", required=True)
+    p = sessions_sub.add_parser("compress", help="Compress local raw sessions without external API calls")
+    p.add_argument("--input", required=True)
+    p.add_argument("--out-dir", default=None)
 
     p = sub.add_parser("validate")
     _common(p)
@@ -222,6 +242,26 @@ def main(argv=None) -> int:
         report = run_v1_1_rc(repo_root, strict=args.strict, ci_mode=args.ci)
         _write_json(report)
         return report["exit_code"]
+
+    if args.cmd == "pipeline" and args.pipeline_cmd == "v2.0-rc":
+        report = run_v2_0_rc(repo_root)
+        _write_json(report)
+        return report["exit_code"]
+
+    if args.cmd == "graph" and args.graph_cmd == "export":
+        report = write_governance_graph(repo_root, args.out)
+        _write_json(report)
+        return 0 if report["status"] == "PASS" else 1
+
+    if args.cmd == "dashboard" and args.dashboard_cmd == "build":
+        report = build_dashboard(repo_root, args.out)
+        _write_json(report)
+        return 0 if report["status"] == "PASS" else 1
+
+    if args.cmd == "sessions" and args.sessions_cmd == "compress":
+        report = compress_sessions(repo_root, args.input, args.out_dir)
+        _write_json(report)
+        return 0 if report["status"] in {"PASS", "PASS_WITH_WARNINGS"} else 1
 
     policy = Policy(profile=getattr(args, "profile", "lab"), mode=getattr(args, "mode", "report_only"), repo_root=repo_root, export_scope="public")
     dec = policy.check_mode_command(args.cmd)

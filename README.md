@@ -52,6 +52,19 @@ python -m graph_harness_maintain pipeline v1.1-rc
 python -m graph_harness_maintain pipeline v1.1-rc --strict
 ```
 
+## v2.0 development: read-only graph dashboard foundation
+
+v2.0 adds a local, read-only visualization foundation for the governance graph, dashboard, and compressed session knowledge. Generated artifacts remain local under ignored `artifacts/v2/` paths. Raw sessions remain local and ignored under `sessions/raw/` and `sessions/private/`.
+
+```bash
+python -m graph_harness_maintain graph export
+python -m graph_harness_maintain dashboard build
+python -m graph_harness_maintain sessions compress --input sessions/raw
+python -m graph_harness_maintain pipeline v2.0-rc
+```
+
+The v2.0 dashboard is static and read-only: it has no destructive apply, graph mutation execution, raw archive apply execution, sensitive export, server, npm, or external CDN requirement.
+
 Run proposal-layer checks directly:
 
 ```bash
