@@ -52,6 +52,7 @@ def test_dashboard_file_generated_as_two_page_graph_logs_app() -> None:
         "selectNode",
         "selectEdge",
         "startNodeDrag",
+        "fitGraphToVisible",
         "applyZoom",
         "panZoomState",
         "type-filter-panel",
