@@ -23,7 +23,7 @@ dependencies = []
 [project.scripts]
 ghm = "graph_harness_maintain.cli:main"
 graph-harness-maintain = "graph_harness_maintain.cli:main"
-agent-graph = "graph_harness_maintain.cli:main"
+agent-graph = "agent_memory_graph.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -35,4 +35,4 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/graph_harness_maintain"]
+packages = ["src/graph_harness_maintain", "src/agent_memory_graph"]

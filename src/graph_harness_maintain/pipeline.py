@@ -6,6 +6,11 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from agent_memory_graph.bootstrap import bootstrap_repo as bootstrap_agent_graph_repo, validate_repo as validate_agent_graph_repo
+from agent_memory_graph.export import export_repo_projection
+from agent_memory_graph.repo_adapter import init_repo_manifest
 
 from .adapters import ArtifactStoreAdapter, FileTreeAdapter, GitRepoAdapter
 from .adapter_report import write_adapter_report
@@ -431,13 +436,11 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
     proposal = run_v1_1_rc(repo_root, strict=False, ci_mode=nested_ci_mode)
     raw_dir = repo_root / "sessions" / "raw"
     sessions = compress_sessions(repo_root, raw_dir, artifacts_root / "sessions")
-    profile_index = write_profile_index(repo_root)
-    profile_validation = validate_profile_index(repo_root)
-    project = init_project(repo_root, DEFAULT_PROFILE_ID, DEFAULT_PROJECT_ID)
-    project_validation = validate_project(repo_root, DEFAULT_PROFILE_ID, DEFAULT_PROJECT_ID)
-    graph = write_governance_graph(repo_root, artifacts_root / "graph" / "governance-graph.json")
-    lineage = write_lineage_index(repo_root, artifacts_root / "lineage" / "log-index.json")
-    lineage_validation = validate_lineage_index(repo_root)
+    repo_manifest = init_repo_manifest(repo_root, DEFAULT_PROFILE_ID, DEFAULT_PROJECT_ID, force=False)
+    with TemporaryDirectory(prefix="agent-memory-graph-") as temp_memory_root:
+        bootstrap = bootstrap_agent_graph_repo(repo_root, temp_memory_root)
+        agent_graph_validation = validate_agent_graph_repo(repo_root, temp_memory_root)
+        export = export_repo_projection(repo_root, temp_memory_root)
     dashboard = build_dashboard(repo_root, artifacts_root / "dashboard" / "index.html")
     session_raw_committed = _raw_sessions_committed(repo_root)
 
@@ -445,13 +448,10 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
         "local_rc": local,
         "v1_1_rc": proposal,
         "sessions": sessions,
-        "profile_index": profile_index,
-        "profile_validation": profile_validation,
-        "project": project,
-        "project_validation": project_validation,
-        "graph": graph,
-        "lineage": lineage,
-        "lineage_validation": lineage_validation,
+        "repo_manifest": repo_manifest,
+        "bootstrap": bootstrap,
+        "agent_graph_validation": agent_graph_validation,
+        "export": export,
         "dashboard": dashboard,
     }
     if stage_overrides:
@@ -485,10 +485,15 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
         "active_profile": DEFAULT_PROFILE_ID,
         "project_support": True,
         "default_project": DEFAULT_PROJECT_ID,
-        "lineage_index_available": lineage.get("status") == "PASS",
+        "lineage_index_available": export.get("status") == "PASS",
         "view_in_logs_requires_mapping": True,
         "llm_hub_api_enabled": False,
         "agent_triggered_archive": True,
+        "global_agent_memory_graph_supported": True,
+        "repo_context_manifest_available": (repo_root / ".agent" / "context.json").exists(),
+        "graph_governed_context_protocol": True,
+        "raw_sessions_default_read": False,
+        "agent_graph_cli_available": True,
         "blockers": blockers,
         "warnings": warnings,
         "stages": stages,

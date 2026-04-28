@@ -1,8 +1,8 @@
 # graph-harness-maintain
 
-**Status:** v1.1 reviewed proposal baseline; release-hardening candidate.
+**Status:** v2.0-dev reusable Agent Memory Graph reference implementation.
 
-`graph-harness-maintain` provides a conservative, local-only governance and audit pipeline for agent-maintained repositories. It inspects repository identity, release surface, approval gates, evidence, provenance, tests, smoke checks, leak scanning, and v1.1 reviewed-action proposal artifacts before any external publication step.
+`graph-harness-maintain` provides a conservative, local-only governance and audit pipeline for agent-maintained repositories. It inspects repository identity, release surface, approval gates, evidence, provenance, tests, smoke checks, leak scanning, and v2 graph-governed context artifacts before any external publication step.
 
 ## Project purpose
 
@@ -52,23 +52,23 @@ python -m graph_harness_maintain pipeline v1.1-rc
 python -m graph_harness_maintain pipeline v1.1-rc --strict
 ```
 
-## v2.0 development: read-only graph dashboard foundation
+## v2.0 development: reusable global Agent Memory Graph protocol
 
-v2.0 adds a local, read-only visualization foundation centered on two static routes: `#/graph` for the large governance graph and `#/logs` for local artifact/log inspection. Generated artifacts remain local under ignored `artifacts/v2/` paths. Raw sessions remain local and ignored under `sessions/raw/` and `sessions/private/`.
+v2.0 promotes `graph-harness-maintain` from a repo-local dashboard into the reference implementation and dashboard/export target for a reusable global Agent Memory Graph protocol. The default context order is graph-first: global graph, active profile, active project, project summary, decision ledger, requirements, constraints, lineage index, mapped logs/artifacts, and raw sessions last.
+
+Use the portable `agent-graph` CLI to initialize repo manifests, bootstrap temporary memory roots, validate graph-governed context, archive agent-compiled session JSON, and export repo-local dashboard artifacts:
 
 ```bash
-python -m graph_harness_maintain graph export
-python -m graph_harness_maintain dashboard build
-python -m graph_harness_maintain sessions compress --input sessions/raw
-python -m graph_harness_maintain profile index
-python -m graph_harness_maintain project init
-python -m graph_harness_maintain lineage build
-python -m graph_harness_maintain pipeline v2.0-rc
+agent-graph init-repo --repo . --profile general --project harness-self-governance
+TMP_MEM=$(mktemp -d)
+agent-graph bootstrap --repo . --memory-root "$TMP_MEM"
+agent-graph validate --repo . --memory-root "$TMP_MEM"
+agent-graph export --repo . --memory-root "$TMP_MEM"
 ```
 
-The v2.0 dashboard is static and read-only: it exposes only Graph and Logs primary pages, and it has no destructive apply, graph mutation execution, raw archive apply execution, sensitive export, server, npm, external CDN requirement, or Hub-side LLM/API surface. Profile/project/session compilation is agent-triggered and written as structured local artifacts; the dashboard only reads those artifacts. The lineage index provides exact local artifact mappings for enabled "View in Logs" actions, while unmapped graph items remain disabled rather than guessed.
+The repo manifest lives at `.agent/context.json`. Repo-local exports remain deterministic under `artifacts/v2/`. The dashboard is still static and read-only: no backend, no npm, no external CDN, no Hub-side LLM API, no destructive apply, no graph mutation execution, and no sensitive export.
 
-Run proposal-layer checks directly:
+Legacy v2 helper commands remain available:
 
 ```bash
 python -m graph_harness_maintain proposal create

@@ -52,6 +52,11 @@ def test_v2_pipeline_reports_read_only_safety_boundary() -> None:
     assert data["view_in_logs_requires_mapping"] is True
     assert data["llm_hub_api_enabled"] is False
     assert data["agent_triggered_archive"] is True
+    assert data["global_agent_memory_graph_supported"] is True
+    assert data["repo_context_manifest_available"] is True
+    assert data["graph_governed_context_protocol"] is True
+    assert data["raw_sessions_default_read"] is False
+    assert data["agent_graph_cli_available"] is True
 
 
 def test_v2_pipeline_cli_command_writes_pipeline_run() -> None:
@@ -87,5 +92,20 @@ def test_v2_cli_help_commands_work() -> None:
     ]
     for args in commands:
         result = _run(*args)
+        assert result.returncode == 0, (args, result.stderr)
+        assert "usage:" in result.stdout
+
+
+def test_agent_memory_graph_module_help_commands_work() -> None:
+    commands = [
+        ("--help",),
+        ("init-repo", "--help"),
+        ("bootstrap", "--help"),
+        ("validate", "--help"),
+        ("archive-session", "--help"),
+        ("export", "--help"),
+    ]
+    for args in commands:
+        result = subprocess.run([PY, "-m", "agent_memory_graph", *args], cwd=ROOT, text=True, capture_output=True, env=_env())
         assert result.returncode == 0, (args, result.stderr)
         assert "usage:" in result.stdout

@@ -257,19 +257,87 @@ def build_graph_summary(graph: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _ensure_dashboard_graph_context(graph: dict[str, Any]) -> dict[str, Any]:
+    nodes = [dict(node) for node in graph.get("nodes", [])]
+    edges = [dict(edge) for edge in graph.get("edges", [])]
+    node_ids = {node.get("id") for node in nodes}
+    node_types = {node.get("type") for node in nodes}
+
+    if "tool" not in node_types:
+        nodes.append(
+            {
+                "id": "tool:agent-graph-cli",
+                "type": "tool",
+                "label": "agent-graph CLI",
+                "summary": "Portable CLI for graph-governed repo bootstrap, validate, archive-session, and export.",
+                "metadata": {"profile_id": DEFAULT_PROFILE_ID, "project_id": DEFAULT_PROJECT_ID},
+            }
+        )
+        node_ids.add("tool:agent-graph-cli")
+
+    if "knowledge_source" not in node_types:
+        nodes.append(
+            {
+                "id": "knowledge:graph-governed-context-docs",
+                "type": "knowledge_source",
+                "label": "graph-governed context docs",
+                "path": "docs/agent/graph-governed-context-protocol.md",
+                "summary": "Protocol documentation for graph-first context loading with raw sessions last.",
+                "metadata": {"profile_id": DEFAULT_PROFILE_ID, "project_id": DEFAULT_PROJECT_ID},
+            }
+        )
+        node_ids.add("knowledge:graph-governed-context-docs")
+
+    project_node_id = f"project:{DEFAULT_PROFILE_ID}:{DEFAULT_PROJECT_ID}"
+    if project_node_id in node_ids:
+        edge_ids = {edge.get("id") for edge in edges}
+        if "tool:agent-graph-cli" in node_ids and "edge:dashboard-project-uses-agent-graph" not in edge_ids:
+            edges.append(
+                {
+                    "id": "edge:dashboard-project-uses-agent-graph",
+                    "source": project_node_id,
+                    "target": "tool:agent-graph-cli",
+                    "type": "uses_tool",
+                    "relation": "uses_tool",
+                }
+            )
+        if "knowledge:graph-governed-context-docs" in node_ids and "edge:dashboard-project-references-context-docs" not in edge_ids:
+            edges.append(
+                {
+                    "id": "edge:dashboard-project-references-context-docs",
+                    "source": project_node_id,
+                    "target": "knowledge:graph-governed-context-docs",
+                    "type": "references",
+                    "relation": "references",
+                }
+            )
+
+    normalized = dict(graph)
+    normalized["nodes"] = sorted(nodes, key=lambda item: (item.get("type", ""), item.get("id", "")))
+    normalized["edges"] = sorted(edges, key=lambda item: (item.get("relation") or item.get("type", ""), item.get("id", "")))
+    return normalized
+
+
 def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
     repo_root = Path(repo_root).resolve()
     graph_path = repo_root / "artifacts" / "v2" / "graph" / "governance-graph.json"
-    write_profile_index(repo_root)
-    init_project(repo_root, DEFAULT_PROFILE_ID, DEFAULT_PROJECT_ID)
-    write_governance_graph(repo_root, graph_path)
-    write_lineage_index(repo_root)
+    profile_index_path = repo_root / "artifacts" / "v2" / "profiles" / "profile-index.json"
+    project_manifest_path = repo_root / "artifacts" / "v2" / "projects" / DEFAULT_PROFILE_ID / DEFAULT_PROJECT_ID / "project-manifest.json"
+    lineage_path = repo_root / "artifacts" / "v2" / "lineage" / "log-index.json"
+    if not profile_index_path.exists():
+        write_profile_index(repo_root)
+    if not project_manifest_path.exists():
+        init_project(repo_root, DEFAULT_PROFILE_ID, DEFAULT_PROJECT_ID)
+    if not graph_path.exists():
+        write_governance_graph(repo_root, graph_path)
+    if not lineage_path.exists():
+        write_lineage_index(repo_root)
     session_path = ensure_session_index(repo_root)
-    graph = _load_json(graph_path)
+    graph = _ensure_dashboard_graph_context(_load_json(graph_path))
     sessions = _load_json(session_path)
-    profile_index = _load_json(repo_root / "artifacts" / "v2" / "profiles" / "profile-index.json")
-    lineage_index = _load_json(repo_root / "artifacts" / "v2" / "lineage" / "log-index.json")
-    project_manifest = _load_json(repo_root / "artifacts" / "v2" / "projects" / DEFAULT_PROFILE_ID / DEFAULT_PROJECT_ID / "project-manifest.json")
+    profile_index = _load_json(profile_index_path)
+    lineage_index = _load_json(lineage_path)
+    project_manifest = _load_json(project_manifest_path)
     project_summary = _load_json(repo_root / "artifacts" / "v2" / "projects" / DEFAULT_PROFILE_ID / DEFAULT_PROJECT_ID / "project-summary.json")
     pipeline = _load_json(repo_root / "artifacts" / "v2" / "pipeline-run.json")
     inventory, inventory_warnings = collect_file_inventory(repo_root, graph)

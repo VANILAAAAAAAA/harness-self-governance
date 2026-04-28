@@ -1,0 +1,53 @@
+# Graph-Governed Context Protocol
+
+## Default context order
+
+Use graph-governed context loading in this order:
+
+1. global graph
+2. active profile
+3. active project
+4. project summary
+5. decision ledger
+6. requirements
+7. constraints
+8. lineage index
+9. mapped logs / artifacts
+10. raw sessions
+
+`raw sessions` are source material and must remain the last-resort context layer.
+
+## Semantics
+
+- **graph** = navigation layer
+- **project artifacts** = stable knowledge layer
+- **lineage / logs** = evidence layer
+- **raw sessions** = source material / recovery layer
+
+## Profile and project boundaries
+
+- `general` is the governance hub for global protocol rules, cross-project stewardship, and reusable exports.
+- `ehrlab` is the domain knowledge profile for EHR and healthcare work.
+- Profiles are stable context partitions, not raw-session dumps.
+- Projects hold deterministic artifacts that can be re-read without replaying whole sessions.
+
+## Repo adoption
+
+A repository opts into the protocol by committing `.agent/context.json`.
+
+That manifest binds the repo to:
+
+- one active profile
+- one active project
+- a global memory source
+- deterministic repo-local export targets
+
+## Phase boundary
+
+This phase is local-only:
+
+- no backend
+- no Hub-side LLM API
+- no external CDN
+- no graph mutation execution
+- no destructive apply flow
