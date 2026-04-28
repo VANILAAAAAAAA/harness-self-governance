@@ -1,3 +1,3 @@
-"""Governance and audit pipeline for graph-harness-maintain."""
+"""Local governance, audit, and reviewed-proposal pipeline."""
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"

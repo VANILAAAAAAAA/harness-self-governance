@@ -1,104 +1,136 @@
 # graph-harness-maintain
 
-**Status:** v1.0 local governance pipeline.
+**Status:** v1.1 reviewed proposal baseline; release-hardening candidate.
 
-`graph-harness-maintain` provides a conservative, local-only governance and audit pipeline for agent-maintained repositories. It inspects repository identity, release surface, approval gates, evidence, provenance, tests, smoke checks, and leak scanning before any external publication step.
+`graph-harness-maintain` provides a conservative, local-only governance and audit pipeline for agent-maintained repositories. It inspects repository identity, release surface, approval gates, evidence, provenance, tests, smoke checks, leak scanning, and v1.1 reviewed-action proposal artifacts before any external publication step.
 
 ## Project purpose
 
-The project exists to keep a maintenance harness observable, auditable, and approval-gated. v1.0 focuses on read-only inspection, local artifact generation, and proposal-only recommendations.
+The project keeps a maintenance harness observable, auditable, deterministic, and approval-gated. The implemented baseline has two local artifact tracks:
 
-## v1.0 scope
+- **v1.0 local governance pipeline:** read-only inspection, local artifact generation, evidence indexing, and release-candidate reports.
+- **v1.1 reviewed proposal layer:** proposal/template/adapter/provenance validation that remains proposal-only and does not execute reviewed actions.
 
-v1.0 includes:
+## Install
 
-- identity guard
-- git state inspection
-- open-source release surface audit
-- approval gate enforcement
-- read-only maintenance adapters
-- evidence indexing
-- local provenance state generation
-- tests and smoke checks
-- leak scan and sensitive-term review
-- local report generation
+For development or local release validation:
 
-v1.0 does **not** execute destructive actions, remote publication, graph/events mutation, quarantine, rehydrate, provenance upgrade, or sensitive export.
+```bash
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+```
+
+Optional packaging check:
+
+```bash
+python -m pip install build
+python -m build
+```
+
+Do not commit `dist/`, `build/`, or generated `*.egg-info/` outputs.
+
+## Quickstart
+
+Use either the installed CLI or module form:
+
+```bash
+ghm --help
+python -m graph_harness_maintain --help
+```
+
+Run the v1 local release-candidate pipeline:
+
+```bash
+python -m graph_harness_maintain pipeline local-rc --ci
+python -m graph_harness_maintain pipeline local-rc --strict
+```
+
+Run the v1.1 reviewed-action local release-candidate pipeline:
+
+```bash
+python -m graph_harness_maintain pipeline v1.1-rc
+python -m graph_harness_maintain pipeline v1.1-rc --strict
+```
+
+Run proposal-layer checks directly:
+
+```bash
+python -m graph_harness_maintain proposal create
+python -m graph_harness_maintain proposal validate
+python -m graph_harness_maintain templates validate
+python -m graph_harness_maintain adapter-report
+python -m graph_harness_maintain provenance append --local-test
+python -m graph_harness_maintain provenance current-state --ci
+```
+
+Legacy read-only graph commands remain available:
+
+```bash
+graph-harness-maintain validate \
+  --schema tests/fixtures/synthetic_schema.yaml \
+  --graph tests/fixtures/synthetic_graph.jsonl \
+  --events tests/fixtures/synthetic_events.jsonl \
+  --evidence-candidates tests/fixtures/synthetic_evidence_candidate_index.jsonl \
+  --weak-associations tests/fixtures/synthetic_weak_association_sidecar_index.jsonl
+```
+
+## Artifact layout
+
+Generated artifacts are local validation outputs and should not be committed.
+
+- v1 artifacts: `artifacts/v1/`
+- v1.1 artifacts: `artifacts/v1.1/`
+
+Important v1.1 outputs include:
+
+- `artifacts/v1.1/proposals/reviewed-apply-plan.json`
+- `artifacts/v1.1/proposal-validation.json`
+- `artifacts/v1.1/template-validation.json`
+- `artifacts/v1.1/adapter-report.json`
+- `artifacts/v1.1/adapter-report.md`
+- `artifacts/v1.1/provenance/local-test-events.jsonl`
+- `artifacts/v1.1/provenance/current-state.json`
+- `artifacts/v1.1/v1.1-rc-report.md`
 
 ## Architecture
 
 ```mermaid
 flowchart LR
     User[User] --> CLI[ghm CLI]
-    CLI --> Pipeline[local-rc pipeline]
-    Pipeline --> Identity[identity guard]
-    Pipeline --> GitState[git state audit]
-    Pipeline --> Surface[open-source surface audit]
-    Pipeline --> Gates[approval gate policy]
-    Pipeline --> Adapters[read-only adapters]
-    Pipeline --> Evidence[evidence index]
-    Pipeline --> Provenance[local provenance state]
-    Pipeline --> Validation[tests + smoke + leak scan]
-    Validation --> Report[v1-local-rc-report.md]
+    CLI --> V1[v1 local-rc pipeline]
+    CLI --> V11[v1.1 reviewed proposal pipeline]
+    V1 --> Identity[identity guard]
+    V1 --> GitState[git state audit]
+    V1 --> Surface[open-source surface audit]
+    V1 --> Gates[approval gate policy]
+    V1 --> Evidence[evidence index]
+    V1 --> Provenance[local provenance state]
+    V1 --> Validation[tests + smoke + leak scan]
+    V11 --> Proposal[proposal create + validate]
+    V11 --> Templates[template validation]
+    V11 --> Adapter[read-only adapter report]
+    V11 --> LocalAppend[local-test provenance append]
+    V11 --> V11Report[v1.1 RC report]
     Gates -. blocks .-> Publish[commit/push/tag/release/publish]
+    Gates -. blocks .-> Destructive[delete/move/quarantine/rehydrate/raw archive apply/graph mutation]
 ```
 
-## Install
+## Safety boundary
 
-```bash
-python3 -m pip install -e ".[dev]"
-```
+The release baseline is safe by default:
 
-## CLI usage
+- proposal-only behavior by default
+- reviewed apply is gated and not executed
+- `destructive_operations_allowed` is false
+- `remote_publication_allowed` is false
+- raw archive apply is blocked/inert
+- delete, move, quarantine, and rehydrate are blocked/inert
+- graph mutation and graph/events mutation are blocked/inert
+- sensitive export is blocked
+- provenance append supports only `--local-test` artifact writes
+- generated reports stay local unless deliberately promoted to documentation
 
-```bash
-ghm --help
-ghm identity-check
-ghm audit-release
-ghm locate-evidence
-ghm check-gates
-ghm provenance current-state
-ghm pipeline local-rc
-ghm pipeline local-rc --strict
-ghm pipeline local-rc --ci
-```
-
-Module form also works:
-
-```bash
-python -m graph_harness_maintain --help
-python -m graph_harness_maintain pipeline local-rc
-```
-
-Legacy read-only graph commands remain available:
-
-```bash
-graph-harness-maintain validate --schema tests/fixtures/synthetic_schema.yaml --graph tests/fixtures/synthetic_graph.jsonl --events tests/fixtures/synthetic_events.jsonl --evidence-candidates tests/fixtures/synthetic_evidence_candidate_index.jsonl --weak-associations tests/fixtures/synthetic_weak_association_sidecar_index.jsonl
-```
-
-## Pipeline command
-
-Primary local release-candidate command:
-
-```bash
-ghm pipeline local-rc
-```
-
-## Approval gates
-
-Allowed without human approval:
-
-- read-only audit
-- local tests
-- local leak scan
-- local report generation
-- local evidence index generation
-- local provenance state generation
-- package import smoke test
-- CLI smoke test
-- local docs/policy/template edits
-
-Always require human approval:
+Always require explicit human approval for:
 
 - `git_commit`
 - `git_push`
@@ -108,33 +140,41 @@ Always require human approval:
 - `raw_archive_apply`
 - `delete`
 - `move`
+- `graph_mutation`
 - `graph_events_mutation`
 - `quarantine`
 - `rehydrate`
 - `provenance_upgrade`
 - `sensitive_export`
-
-## Security model
-
-- public-facing files must not contain tokens, credentials, local absolute paths, or private profile paths
-- runtime reports stay local
-- release readiness stops before publication actions
-- adapter mutations are blocked behind approval requirements
-
-## Limitations
-
-- no destructive apply path in v1.0
-- no remote publication execution
-- no graph/event mutation
-- no provenance upgrade
-- no sensitive export
+- `reviewed_apply`
+- `apply_plan_execute`
+- `force_push`
 
 ## Development checks
 
 ```bash
-pytest
-python -m graph_harness_maintain pipeline local-rc
+python -m pytest
+python -m graph_harness_maintain pipeline local-rc --ci
+python -m graph_harness_maintain pipeline local-rc --strict
+python -m graph_harness_maintain pipeline v1.1-rc
+python -m graph_harness_maintain pipeline v1.1-rc --strict
 ```
+
+Before any local commit, verify the configured identity is the approved user-owned identity for the repository:
+
+```bash
+git config --local user.name
+git config --local user.email
+git var GIT_AUTHOR_IDENT
+git var GIT_COMMITTER_IDENT
+```
+
+## Security model
+
+- public-facing files must not contain tokens, credentials, local absolute paths, or private profile paths
+- runtime reports stay under ignored artifact paths
+- release readiness stops before publication actions
+- adapter mutations are documented as approval-required; adapter reports do not execute side effects
 
 ## License
 
