@@ -52,11 +52,23 @@ def _rel(repo_root: Path, path: Path) -> str:
 
 
 def _node(node_id: str, node_type: str, label: str, **extra: Any) -> dict[str, Any]:
+    summary = extra.pop("summary", label)
+    status = extra.pop("status", "available" if extra.get("exists", True) is not False else "missing")
+    tags = sorted(set(extra.pop("tags", []) + [node_type]))
+    metadata = dict(extra.pop("metadata", {}))
+    for key in ("path", "privacy", "source_hash", "exists"):
+        if key in extra:
+            metadata[key] = extra[key]
     payload = {
         "id": node_id,
         "type": node_type,
+        "kind": node_type,
         "label": label,
-        "summary": extra.pop("summary", label),
+        "status": status,
+        "tags": tags,
+        "metadata": metadata,
+        "description": summary,
+        "summary": summary,
         "read_only": extra.pop("read_only", True),
         "sensitivity": extra.pop("sensitivity", "none"),
     }
@@ -65,11 +77,16 @@ def _node(node_id: str, node_type: str, label: str, **extra: Any) -> dict[str, A
 
 
 def _edge(edge_id: str, source: str, target: str, edge_type: str, **extra: Any) -> dict[str, Any]:
+    metadata = dict(extra.pop("metadata", {}))
     payload = {
         "id": edge_id,
         "source": source,
         "target": target,
         "type": edge_type,
+        "relation": edge_type,
+        "label": edge_type.replace("_", " "),
+        "status": extra.pop("status", "active"),
+        "metadata": metadata,
         "confidence": extra.pop("confidence", 1.0),
     }
     payload.update(extra)

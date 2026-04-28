@@ -49,3 +49,5 @@ def test_graph_export_includes_governance_concepts_and_writes_json() -> None:
         assert needle in labels
     assert data["summary"]["read_only"] is True
     assert data["summary"]["destructive_operations_allowed"] is False
+    assert all("kind" in node and "status" in node and "tags" in node and "metadata" in node and "description" in node for node in data["nodes"])
+    assert all("label" in edge and "relation" in edge and "metadata" in edge for edge in data["edges"])
