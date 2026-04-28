@@ -49,8 +49,21 @@ def test_dashboard_file_generated_as_two_page_graph_logs_app() -> None:
         "startNodeDrag",
         "applyZoom",
         "panZoomState",
+        "type-filter-panel",
+        "visible-node-count",
+        "filterNodesByType",
+        "clearGraphFilters",
+        "activeGraphTypes",
+        "renderTypeFilters",
+        "activeLogGroup",
+        "selectLogGroup",
+        "file-table-scroll",
+        "toggleTheme",
     ]:
         assert needle in html
+    assert "toggleTheme" in html
+    assert "location.hash = '#/logs'" not in html
+    assert "\\n\\n[local preview truncated]" in html
     assert "<script src=" not in html
     assert "<link rel=\"stylesheet\"" not in html
 
@@ -74,6 +87,10 @@ def test_dashboard_embeds_graph_logs_sessions_and_safety_data() -> None:
     assert any(item["group"] in {"artifacts", "policies", "proposals", "provenance", "system"} for item in data["file_inventory"])
     assert "governance-graph.json" in html
     assert "session-index.json" in html
+    assert data["graph_filter_types"]
+    assert "tool" in data["graph_filter_types"]
+    assert "knowledge_source" in data["graph_filter_types"]
+    assert data["log_groups"] == ["artifacts", "sessions", "proposals", "policies", "provenance", "system"]
 
 
 def test_collect_file_inventory_handles_missing_dirs_and_previews_json(tmp_path: Path) -> None:

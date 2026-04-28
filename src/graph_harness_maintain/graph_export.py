@@ -114,6 +114,71 @@ def _load_json(path: Path) -> dict[str, Any] | None:
         return None
 
 
+
+
+def _slug(value: str) -> str:
+    return "".join(ch.lower() if ch.isalnum() else "-" for ch in value).strip("-") or "item"
+
+
+def _capability_nodes_and_edges(repo_root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+
+    cli_tools = [
+        ("graph-export", "graph export", "python -m graph_harness_maintain graph export"),
+        ("dashboard-build", "dashboard build", "python -m graph_harness_maintain dashboard build"),
+        ("sessions-compress", "sessions compress", "python -m graph_harness_maintain sessions compress --input sessions/raw"),
+        ("pipeline-v2.0-rc", "pipeline v2.0-rc", "python -m graph_harness_maintain pipeline v2.0-rc"),
+        ("pipeline-local-rc", "pipeline local-rc", "python -m graph_harness_maintain pipeline local-rc"),
+        ("pipeline-v1.1-rc", "pipeline v1.1-rc", "python -m graph_harness_maintain pipeline v1.1-rc"),
+    ]
+    for slug, label, command in cli_tools:
+        tool_id = f"tool:cli:{slug}"
+        nodes.append(_node(tool_id, "tool", label, summary=f"Local CLI tool: {command}", tags=["tool", "cli"], metadata={"command": command}))
+        edges.append(_edge(f"edge:pipeline-v2-uses-tool-{slug}", "pipeline:v2.0-rc", tool_id, "uses_tool", metadata={"command": command}))
+
+    module_root = repo_root / "src" / "graph_harness_maintain"
+    for path in sorted(module_root.rglob("*.py"))[:36] if module_root.exists() else []:
+        rel = _rel(repo_root, path)
+        name = path.relative_to(module_root).with_suffix("").as_posix().replace("/", ".")
+        node_id = f"knowledge:src-module:{_slug(name)}"
+        nodes.append(_node(node_id, "knowledge_source", f"module {name}", path=rel, summary=f"Source module inventory node for {rel}", tags=["source", "module"]))
+        if path.name in {"dashboard.py", "graph_export.py", "sessions.py", "pipeline.py", "cli.py"}:
+            edges.append(_edge(f"edge:{node_id}:derived-from-docs", node_id, "knowledge:docs", "derived_from", confidence=0.7))
+            edges.append(_edge(f"edge:pipeline-v2-references-{_slug(name)}", "pipeline:v2.0-rc", node_id, "references", confidence=0.75))
+
+    tests_root = repo_root / "tests"
+    for path in sorted(tests_root.glob("test_*.py"))[:28] if tests_root.exists() else []:
+        rel = _rel(repo_root, path)
+        test_id = f"knowledge:test:{_slug(path.stem)}"
+        nodes.append(_node(test_id, "knowledge_source", path.stem, path=rel, summary=f"Test coverage source: {rel}", tags=["test", "validation"]))
+        edges.append(_edge(f"edge:test-pytest-references-{_slug(path.stem)}", "test:pytest", test_id, "references", confidence=0.8))
+
+    for root in [repo_root / "docs" / "plans", repo_root / "docs"]:
+        if root.exists():
+            for path in sorted(root.glob("*.md"))[:20]:
+                rel = _rel(repo_root, path)
+                doc_id = f"knowledge:doc:{_slug(path.stem)}"
+                nodes.append(_node(doc_id, "knowledge_source", path.stem, path=rel, summary=f"Documentation knowledge source: {rel}", tags=["doc", "knowledge"]))
+                edges.append(_edge(f"edge:docs-reference-{_slug(path.stem)}", "knowledge:docs", doc_id, "references", confidence=0.75))
+
+    policies_root = repo_root / "policies"
+    for path in sorted(policies_root.glob("*")) if policies_root.exists() else []:
+        if path.is_file():
+            rel = _rel(repo_root, path)
+            policy_id = f"knowledge:policy:{_slug(path.stem)}"
+            nodes.append(_node(policy_id, "knowledge_source", path.stem, path=rel, summary=f"Policy source file: {rel}", tags=["policy", "safety"]))
+            edges.append(_edge(f"edge:policy-boundary-references-{_slug(path.stem)}", "policy:safety-boundary", policy_id, "references", confidence=0.8))
+
+    skill_names = ["graph-harness-maintain", "test-driven-development", "writing-plans"]
+    for name in skill_names:
+        skill_id = f"tool:skill:{_slug(name)}"
+        nodes.append(_node(skill_id, "tool", f"skill {name}", summary=f"Agent procedural skill relevant to v2 graph/log dashboard iteration: {name}", tags=["skill", "tool", "procedure"], metadata={"skill": name}))
+        edges.append(_edge(f"edge:v2-uses-skill-{_slug(name)}", "pipeline:v2.0-rc", skill_id, "uses_tool", confidence=0.65))
+        edges.append(_edge(f"edge:skill-{_slug(name)}-governed-by-policy", skill_id, "policy:safety-boundary", "governed_by", confidence=0.65))
+
+    return nodes, edges
+
 def _session_nodes_and_edges(repo_root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
     nodes: list[dict[str, Any]] = []
     edges: list[dict[str, Any]] = []
@@ -229,6 +294,10 @@ def build_governance_graph(repo_root: Path | str) -> dict[str, Any]:
         _edge("edge:docs-reference-decision", "knowledge:docs", "decision:read-only-v2", "references"),
         _edge("edge:v2-artifacts-summarized-into-graph", "artifact:v2-generated-artifacts", "artifact:artifacts/v2/graph/governance-graph.json", "summarized_into"),
     ]
+
+    capability_nodes, capability_edges = _capability_nodes_and_edges(repo_root)
+    nodes.extend(capability_nodes)
+    edges.extend(capability_edges)
 
     session_nodes, session_edges, session_warnings = _session_nodes_and_edges(repo_root)
     nodes.extend(session_nodes)

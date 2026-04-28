@@ -51,3 +51,24 @@ def test_graph_export_includes_governance_concepts_and_writes_json() -> None:
     assert data["summary"]["destructive_operations_allowed"] is False
     assert all("kind" in node and "status" in node and "tags" in node and "metadata" in node and "description" in node for node in data["nodes"])
     assert all("label" in edge and "relation" in edge and "metadata" in edge for edge in data["edges"])
+
+
+def test_graph_export_expands_local_capability_inventory() -> None:
+    graph = build_governance_graph(ROOT)
+    nodes = graph["nodes"]
+    edges = graph["edges"]
+    node_ids = {node["id"] for node in nodes}
+
+    assert len(nodes) >= 45
+    assert len(edges) >= 45
+    assert "tool:cli:graph-export" in node_ids
+    assert "tool:cli:dashboard-build" in node_ids
+    assert "tool:cli:sessions-compress" in node_ids
+    assert "tool:cli:pipeline-v2.0-rc" in node_ids
+    assert any(node["id"].startswith("knowledge:src-module:") for node in nodes)
+    assert any(node["id"].startswith("knowledge:test:") for node in nodes)
+    assert any(node["id"].startswith("knowledge:doc:") for node in nodes)
+    assert any(node["id"].startswith("knowledge:policy:") for node in nodes)
+    assert any(node["type"] == "tool" and "skill" in node["tags"] for node in nodes)
+    assert any(edge["type"] == "uses_tool" and edge["target"].startswith("tool:cli:") for edge in edges)
+    assert any(edge["type"] == "references" and edge["target"].startswith("knowledge:doc:") for edge in edges)
