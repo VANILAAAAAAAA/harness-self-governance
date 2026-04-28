@@ -13,6 +13,12 @@ allowed_without_human_approval:
   - local_docs_edit
   - local_policy_edit
   - local_template_edit
+  - local_proposal_generation
+  - local_proposal_validation
+  - local_template_validation
+  - local_adapter_report_generation
+  - local_provenance_append_test
+  - reviewed_apply_plan_generation
 
 always_require_human_approval:
   - git_commit
@@ -23,11 +29,15 @@ always_require_human_approval:
   - raw_archive_apply
   - delete
   - move
+  - graph_mutation
   - graph_events_mutation
   - quarantine
   - rehydrate
   - provenance_upgrade
   - sensitive_export
+  - reviewed_apply
+  - apply_plan_execute
+  - force_push
 
 blocked_in_v1:
   - destructive_file_operation

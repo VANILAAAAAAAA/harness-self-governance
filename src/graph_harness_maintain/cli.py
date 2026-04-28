@@ -7,12 +7,14 @@ from dataclasses import asdict
 from pathlib import Path
 
 from . import __version__
+from .adapter_report import write_adapter_report
 from .evidence import write_evidence_index
 from .gates import check_action_allowed, ensure_policy_file, load_policy, write_gate_check
 from .identity import run_identity_check
-from .pipeline import run_local_rc
+from .pipeline import run_local_rc, run_v1_1_rc
 from .policy import Policy
-from .provenance import build_current_state, write_current_state
+from .proposals import validate_proposal_file, write_default_proposal
+from .provenance import append_local_test_event, build_current_state, write_current_state
 from .release_audit import write_release_audit
 from .store import GraphStore
 from .sidecar import SidecarIndex
@@ -21,6 +23,7 @@ from .export import export_sanitized_summary, write_export, redact_paths
 from .events import validate_event_log
 from .storage import DEFAULT_ARCHIVE_ROOT, storage_audit, raw_archive_proposal
 from .git_state import collect_git_state
+from .templates import validate_templates
 
 
 def _common(p):
@@ -44,7 +47,7 @@ def _repo_root(args) -> Path:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="ghm", description="graph-harness-maintain v1.0 local governance pipeline")
+    ap = argparse.ArgumentParser(prog="ghm", description="graph-harness-maintain local governance pipeline")
     ap.add_argument("--repo-root", default=str(Path.cwd()), help="Repository root to inspect (default: current working directory)")
     ap.add_argument("--version", action="version", version=__version__)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -58,16 +61,41 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("check-gates", help="Validate approval gates policy")
     p.add_argument("--action", default=None)
 
+    proposal = sub.add_parser("proposal", help="Reviewed apply proposal manifest commands")
+    proposal_sub = proposal.add_subparsers(dest="proposal_cmd", required=True)
+    p = proposal_sub.add_parser("create", help="Create a local proposal manifest")
+    p.add_argument("--title", default="v1.1 reviewed apply plan")
+    p.add_argument("--out")
+    p = proposal_sub.add_parser("validate", help="Validate a local proposal manifest")
+    p.add_argument("--manifest")
+    p.add_argument("--report")
+
+    templates = sub.add_parser("templates", help="Template validation commands")
+    templates_sub = templates.add_subparsers(dest="templates_cmd", required=True)
+    templates_sub.add_parser("validate", help="Validate governance templates")
+
+    p = sub.add_parser("adapter-report", help="Generate adapter-specific maintenance report")
+    p.add_argument("--out")
+    p.add_argument("--markdown-out")
+
     provenance = sub.add_parser("provenance", help="Provenance state commands")
     provenance_sub = provenance.add_subparsers(dest="provenance_cmd", required=True)
     p = provenance_sub.add_parser("current-state", help="Generate current local provenance state")
     p.add_argument("--ci", action="store_true")
+    p = provenance_sub.add_parser("append", help="Append a local-test provenance event under artifacts/")
+    p.add_argument("--local-test", action="store_true", help="Required: only local test append is supported")
+    p.add_argument("--note", default="")
+    p.add_argument("--events-out")
+    p.add_argument("--report")
 
     pipeline = sub.add_parser("pipeline", help="Local governance pipeline")
     pipeline_sub = pipeline.add_subparsers(dest="pipeline_cmd", required=True)
     local_rc = pipeline_sub.add_parser("local-rc", help="Run full local release-candidate pipeline")
     local_rc.add_argument("--strict", action="store_true")
     local_rc.add_argument("--ci", action="store_true")
+    v1_1_rc = pipeline_sub.add_parser("v1.1-rc", help="Run v1.1 reviewed-action local RC pipeline")
+    v1_1_rc.add_argument("--strict", action="store_true")
+    v1_1_rc.add_argument("--ci", action="store_true")
 
     p = sub.add_parser("validate")
     _common(p)
@@ -139,6 +167,34 @@ def main(argv=None) -> int:
         _write_json(report)
         return report.get("exit_code", 0)
 
+    if args.cmd == "proposal" and args.proposal_cmd == "create":
+        report = write_default_proposal(repo_root, args.out, title=args.title)
+        _write_json(report)
+        return 0 if report["status"] == "PASS" else 1
+
+    if args.cmd == "proposal" and args.proposal_cmd == "validate":
+        report = validate_proposal_file(repo_root, args.manifest, args.report)
+        _write_json(report)
+        return 0 if report["status"] == "PASS" else 1
+
+    if args.cmd == "templates" and args.templates_cmd == "validate":
+        report = validate_templates(repo_root)
+        _write_json(report)
+        return 0 if report["status"] == "PASS" else 1
+
+    if args.cmd == "adapter-report":
+        report = write_adapter_report(repo_root, args.out, args.markdown_out)
+        _write_json(report)
+        return 0 if report["status"] == "PASS" else 1
+
+    if args.cmd == "provenance" and args.provenance_cmd == "append":
+        if not args.local_test:
+            _write_json({"status": "BLOCKED", "blockers": ["only --local-test provenance append is supported in v1.1"], "exit_code": 2})
+            return 2
+        report = append_local_test_event(repo_root, args.events_out, args.report, note=args.note)
+        _write_json(report)
+        return 0 if report["status"] == "PASS" else 1
+
     if args.cmd == "provenance" and args.provenance_cmd == "current-state":
         git_state = collect_git_state(repo_root)
         identity = run_identity_check(repo_root, artifacts_root / "identity-check.json", ci_mode=args.ci)
@@ -159,6 +215,11 @@ def main(argv=None) -> int:
 
     if args.cmd == "pipeline" and args.pipeline_cmd == "local-rc":
         report = run_local_rc(repo_root, strict=args.strict, ci_mode=args.ci)
+        _write_json(report)
+        return report["exit_code"]
+
+    if args.cmd == "pipeline" and args.pipeline_cmd == "v1.1-rc":
+        report = run_v1_1_rc(repo_root, strict=args.strict, ci_mode=args.ci)
         _write_json(report)
         return report["exit_code"]
 
