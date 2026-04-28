@@ -16,6 +16,9 @@ from .git_state import write_git_state
 from .graph_export import write_governance_graph
 from .identity import IDENTITY_FAIL_EXIT_CODE, run_identity_check
 from .leak_scan import LEAK_SCAN_FAIL_EXIT_CODE, write_leak_scan
+from .lineage_index import validate_lineage_index, write_lineage_index
+from .profiles import validate_profile_index, write_profile_index
+from .projects import DEFAULT_PROJECT_ID, DEFAULT_PROFILE_ID, init_project, validate_project
 from .sessions import compress_sessions, ensure_session_index
 from .proposals import validate_proposal_file, write_default_proposal
 from .provenance import append_local_test_event, build_current_state, write_current_state
@@ -413,7 +416,13 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
     proposal = run_v1_1_rc(repo_root, strict=False, ci_mode=False)
     raw_dir = repo_root / "sessions" / "raw"
     sessions = compress_sessions(repo_root, raw_dir, artifacts_root / "sessions")
+    profile_index = write_profile_index(repo_root)
+    profile_validation = validate_profile_index(repo_root)
+    project = init_project(repo_root, DEFAULT_PROFILE_ID, DEFAULT_PROJECT_ID)
+    project_validation = validate_project(repo_root, DEFAULT_PROFILE_ID, DEFAULT_PROJECT_ID)
     graph = write_governance_graph(repo_root, artifacts_root / "graph" / "governance-graph.json")
+    lineage = write_lineage_index(repo_root, artifacts_root / "lineage" / "log-index.json")
+    lineage_validation = validate_lineage_index(repo_root)
     dashboard = build_dashboard(repo_root, artifacts_root / "dashboard" / "index.html")
     session_raw_committed = _raw_sessions_committed(repo_root)
 
@@ -421,7 +430,13 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
         "local_rc": local,
         "v1_1_rc": proposal,
         "sessions": sessions,
+        "profile_index": profile_index,
+        "profile_validation": profile_validation,
+        "project": project,
+        "project_validation": project_validation,
         "graph": graph,
+        "lineage": lineage,
+        "lineage_validation": lineage_validation,
         "dashboard": dashboard,
     }
     if stage_overrides:
@@ -451,6 +466,14 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
         "remote_publication_allowed": False,
         "sensitive_export_allowed": False,
         "session_raw_committed": session_raw_committed,
+        "profile_support": True,
+        "active_profile": DEFAULT_PROFILE_ID,
+        "project_support": True,
+        "default_project": DEFAULT_PROJECT_ID,
+        "lineage_index_available": lineage.get("status") == "PASS",
+        "view_in_logs_requires_mapping": True,
+        "llm_hub_api_enabled": False,
+        "agent_triggered_archive": True,
         "blockers": blockers,
         "warnings": warnings,
         "stages": stages,
@@ -458,6 +481,10 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
             "artifacts/v2/graph/governance-graph.json",
             "artifacts/v2/dashboard/index.html",
             "artifacts/v2/sessions/session-index.json",
+            "artifacts/v2/profiles/profile-index.json",
+            "artifacts/v2/projects/general/harness-self-governance/project-manifest.json",
+            "artifacts/v2/projects/general/harness-self-governance/project-summary.json",
+            "artifacts/v2/lineage/log-index.json",
             "artifacts/v2/pipeline-run.json",
         ],
         "exit_code": PASS if not blockers else FAIL,

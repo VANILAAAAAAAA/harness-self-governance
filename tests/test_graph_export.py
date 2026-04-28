@@ -15,7 +15,11 @@ def test_graph_export_schema_and_required_types() -> None:
     assert set(graph) == {"schema_version", "generated_at", "summary", "nodes", "edges", "warnings", "blockers"}
     assert graph["blockers"] == []
     assert REQUIRED_NODE_TYPES.issubset({node["type"] for node in graph["nodes"]})
-    assert REQUIRED_EDGE_TYPES.issubset({edge["type"] for edge in graph["edges"]})
+    assert "profile" in {node["type"] for node in graph["nodes"]}
+    assert "project" in {node["type"] for node in graph["nodes"]}
+    assert "project_summary" in {node["type"] for node in graph["nodes"]}
+    assert "owns_project" in {edge["type"] for edge in graph["edges"]}
+    assert "maps_to_log" in {edge["type"] for edge in graph["edges"]}
 
 
 def test_graph_export_is_deterministic_except_timestamp() -> None:

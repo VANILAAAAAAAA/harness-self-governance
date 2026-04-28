@@ -60,10 +60,13 @@ v2.0 adds a local, read-only visualization foundation centered on two static rou
 python -m graph_harness_maintain graph export
 python -m graph_harness_maintain dashboard build
 python -m graph_harness_maintain sessions compress --input sessions/raw
+python -m graph_harness_maintain profile index
+python -m graph_harness_maintain project init
+python -m graph_harness_maintain lineage build
 python -m graph_harness_maintain pipeline v2.0-rc
 ```
 
-The v2.0 dashboard is static and read-only: it exposes only Graph and Logs primary pages, and it has no destructive apply, graph mutation execution, raw archive apply execution, sensitive export, server, npm, or external CDN requirement.
+The v2.0 dashboard is static and read-only: it exposes only Graph and Logs primary pages, and it has no destructive apply, graph mutation execution, raw archive apply execution, sensitive export, server, npm, external CDN requirement, or Hub-side LLM/API surface. Profile/project/session compilation is agent-triggered and written as structured local artifacts; the dashboard only reads those artifacts. The lineage index provides exact local artifact mappings for enabled "View in Logs" actions, while unmapped graph items remain disabled rather than guessed.
 
 Run proposal-layer checks directly:
 

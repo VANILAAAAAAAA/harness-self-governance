@@ -41,6 +41,17 @@ def test_v2_pipeline_reports_read_only_safety_boundary() -> None:
     assert "artifacts/v2/graph/governance-graph.json" in data["artifacts"]
     assert "artifacts/v2/dashboard/index.html" in data["artifacts"]
     assert "artifacts/v2/sessions/session-index.json" in data["artifacts"]
+    assert "artifacts/v2/profiles/profile-index.json" in data["artifacts"]
+    assert "artifacts/v2/projects/general/harness-self-governance/project-manifest.json" in data["artifacts"]
+    assert "artifacts/v2/lineage/log-index.json" in data["artifacts"]
+    assert data["profile_support"] is True
+    assert data["active_profile"] == "general"
+    assert data["project_support"] is True
+    assert data["default_project"] == "harness-self-governance"
+    assert data["lineage_index_available"] is True
+    assert data["view_in_logs_requires_mapping"] is True
+    assert data["llm_hub_api_enabled"] is False
+    assert data["agent_triggered_archive"] is True
 
 
 def test_v2_pipeline_cli_command_writes_pipeline_run() -> None:
@@ -63,6 +74,15 @@ def test_v2_cli_help_commands_work() -> None:
         ("dashboard", "build", "--help"),
         ("sessions", "--help"),
         ("sessions", "compress", "--help"),
+        ("profile", "--help"),
+        ("profile", "index", "--help"),
+        ("profile", "validate", "--help"),
+        ("project", "--help"),
+        ("project", "init", "--help"),
+        ("project", "validate", "--help"),
+        ("lineage", "--help"),
+        ("lineage", "build", "--help"),
+        ("lineage", "validate", "--help"),
         ("pipeline", "v2.0-rc", "--help"),
     ]
     for args in commands:

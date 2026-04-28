@@ -16,6 +16,9 @@ from .graph_export import write_governance_graph
 from .pipeline import run_local_rc, run_v1_1_rc, run_v2_0_rc
 from .policy import Policy
 from .proposals import validate_proposal_file, write_default_proposal
+from .lineage_index import validate_lineage_index, write_lineage_index
+from .profiles import validate_profile_index, write_profile_index
+from .projects import DEFAULT_PROJECT_ID, DEFAULT_PROFILE_ID, init_project, validate_project
 from .sessions import compress_sessions
 from .provenance import append_local_test_event, build_current_state, write_current_state
 from .release_audit import write_release_audit
@@ -116,6 +119,25 @@ def build_parser() -> argparse.ArgumentParser:
     p = sessions_sub.add_parser("compress", help="Compress local raw sessions without external API calls")
     p.add_argument("--input", required=True)
     p.add_argument("--out-dir", default=None)
+
+    profile = sub.add_parser("profile", help="v2 local profile index commands")
+    profile_sub = profile.add_subparsers(dest="profile_cmd", required=True)
+    profile_sub.add_parser("index", help="Write artifacts/v2/profiles/profile-index.json")
+    profile_sub.add_parser("validate", help="Validate artifacts/v2/profiles/profile-index.json")
+
+    project = sub.add_parser("project", help="v2 local project archive commands")
+    project_sub = project.add_subparsers(dest="project_cmd", required=True)
+    p = project_sub.add_parser("init", help="Create or update a local project manifest and archive skeleton")
+    p.add_argument("--profile", default=DEFAULT_PROFILE_ID)
+    p.add_argument("--project", default=DEFAULT_PROJECT_ID)
+    p = project_sub.add_parser("validate", help="Validate a local project manifest and agent-triggered archive schema")
+    p.add_argument("--profile", default=DEFAULT_PROFILE_ID)
+    p.add_argument("--project", default=DEFAULT_PROJECT_ID)
+
+    lineage = sub.add_parser("lineage", help="v2 local graph-to-log lineage index commands")
+    lineage_sub = lineage.add_subparsers(dest="lineage_cmd", required=True)
+    lineage_sub.add_parser("build", help="Build artifacts/v2/lineage/log-index.json")
+    lineage_sub.add_parser("validate", help="Validate artifacts/v2/lineage/log-index.json")
 
     p = sub.add_parser("validate")
     _common(p)
@@ -262,6 +284,36 @@ def main(argv=None) -> int:
         report = compress_sessions(repo_root, args.input, args.out_dir)
         _write_json(report)
         return 0 if report["status"] in {"PASS", "PASS_WITH_WARNINGS"} else 1
+
+    if args.cmd == "profile" and args.profile_cmd == "index":
+        report = write_profile_index(repo_root)
+        _write_json(report)
+        return 0 if report["status"] == "PASS" else 1
+
+    if args.cmd == "profile" and args.profile_cmd == "validate":
+        report = validate_profile_index(repo_root)
+        _write_json(report)
+        return 0 if report["status"] == "PASS" else 1
+
+    if args.cmd == "project" and args.project_cmd == "init":
+        report = init_project(repo_root, args.profile, args.project)
+        _write_json(report)
+        return 0 if report["status"] == "PASS" else 1
+
+    if args.cmd == "project" and args.project_cmd == "validate":
+        report = validate_project(repo_root, args.profile, args.project)
+        _write_json(report)
+        return 0 if report["status"] == "PASS" else 1
+
+    if args.cmd == "lineage" and args.lineage_cmd == "build":
+        report = write_lineage_index(repo_root)
+        _write_json(report)
+        return 0 if report["status"] == "PASS" else 1
+
+    if args.cmd == "lineage" and args.lineage_cmd == "validate":
+        report = validate_lineage_index(repo_root)
+        _write_json(report)
+        return 0 if report["status"] == "PASS" else 1
 
     policy = Policy(profile=getattr(args, "profile", "lab"), mode=getattr(args, "mode", "report_only"), repo_root=repo_root, export_scope="public")
     dec = policy.check_mode_command(args.cmd)

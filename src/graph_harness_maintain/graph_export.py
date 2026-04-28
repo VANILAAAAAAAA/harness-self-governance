@@ -8,6 +8,9 @@ from typing import Any
 SCHEMA_VERSION = "2.0"
 
 REQUIRED_NODE_TYPES = {
+    "profile",
+    "project",
+    "project_summary",
     "pipeline_run",
     "artifact",
     "report",
@@ -26,6 +29,12 @@ REQUIRED_NODE_TYPES = {
 }
 
 REQUIRED_EDGE_TYPES = {
+    "owns_project",
+    "archives_session",
+    "summarizes",
+    "supports",
+    "constrains",
+    "maps_to_log",
     "generated",
     "validates",
     "blocks",
@@ -113,6 +122,103 @@ def _load_json(path: Path) -> dict[str, Any] | None:
     except (OSError, json.JSONDecodeError):
         return None
 
+
+def _load_profile_index(repo_root: Path) -> dict[str, Any]:
+    from .profiles import build_profile_index
+
+    return _load_json(repo_root / "artifacts" / "v2" / "profiles" / "profile-index.json") or build_profile_index()
+
+
+def _load_project_manifest(repo_root: Path, profile_id: str, project_id: str) -> dict[str, Any]:
+    from .projects import build_project_manifest
+
+    return _load_json(repo_root / "artifacts" / "v2" / "projects" / profile_id / project_id / "project-manifest.json") or build_project_manifest(profile_id, project_id)
+
+
+def _load_project_summary(repo_root: Path, profile_id: str, project_id: str) -> dict[str, Any] | None:
+    return _load_json(repo_root / "artifacts" / "v2" / "projects" / profile_id / project_id / "project-summary.json")
+
+
+def _profile_project_nodes_and_edges(repo_root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    index = _load_profile_index(repo_root)
+    for profile in index.get("profiles", []):
+        profile_id = profile.get("profile_id", "unknown")
+        profile_node = f"profile:{profile_id}"
+        nodes.append(
+            _node(
+                profile_node,
+                "profile",
+                profile.get("label") or profile_id,
+                summary=profile.get("description") or profile_id,
+                metadata={"profile_id": profile_id, "role": profile.get("role"), "projects": profile.get("projects", [])},
+            )
+        )
+        projects = profile.get("projects", [])
+        if not projects and profile_id == "ehrlab":
+            warnings.append("ehrlab has no archived projects yet; dashboard should show an empty state")
+        for project_id in projects:
+            manifest = _load_project_manifest(repo_root, profile_id, project_id)
+            project_node = f"project:{profile_id}:{project_id}"
+            summary_node = f"project_summary:{profile_id}:{project_id}"
+            nodes.append(
+                _node(
+                    project_node,
+                    "project",
+                    manifest.get("title") or project_id,
+                    path=f"artifacts/v2/projects/{profile_id}/{project_id}/project-manifest.json",
+                    summary=f"Project archive manifest for {profile_id}/{project_id}",
+                    metadata={"profile_id": profile_id, "project_id": project_id, "role": manifest.get("role")},
+                )
+            )
+            summary = _load_project_summary(repo_root, profile_id, project_id)
+            nodes.append(
+                _node(
+                    summary_node,
+                    "project_summary",
+                    f"{manifest.get('title') or project_id} summary",
+                    path=manifest.get("summary_path"),
+                    privacy="local_only",
+                    summary=(summary or {}).get("summary") or "Project summary is populated by agent-triggered archive artifacts.",
+                    metadata={"profile_id": profile_id, "project_id": project_id, "archive_contract": "agent_triggered"},
+                )
+            )
+            edges.append(_edge(f"edge:profile:{profile_id}:owns-project:{project_id}", profile_node, project_node, "owns_project"))
+            edges.append(_edge(f"edge:project:{profile_id}:{project_id}:summarizes", project_node, summary_node, "summarizes"))
+            edges.append(_edge(f"edge:project:{profile_id}:{project_id}:governed-by-policy", project_node, "policy:safety-boundary", "governed_by"))
+            if summary:
+                for decision in summary.get("decisions", []):
+                    node_id = decision.get("id") or f"decision:{_slug(decision.get('text', project_id))}"
+                    nodes.append(_node(node_id, "decision", decision.get("text", node_id)[:80], summary=decision.get("text", node_id), metadata={"profile_id": profile_id, "project_id": project_id, "source": decision.get("source")}))
+                    edges.append(_edge(f"edge:{summary_node}:summarizes:{node_id}", summary_node, node_id, "summarizes"))
+                for requirement in summary.get("requirements", []):
+                    node_id = requirement.get("id") or f"requirement:{_slug(requirement.get('text', project_id))}"
+                    nodes.append(_node(node_id, "requirement", requirement.get("text", node_id)[:80], summary=requirement.get("text", node_id), metadata={"profile_id": profile_id, "project_id": project_id, "source": requirement.get("source")}))
+                    edges.append(_edge(f"edge:{summary_node}:summarizes:{node_id}", summary_node, node_id, "summarizes"))
+                for constraint in summary.get("constraints", []):
+                    node_id = constraint.get("id") or f"constraint:{_slug(constraint.get('text', project_id))}"
+                    nodes.append(_node(node_id, "constraint", constraint.get("text", node_id)[:80], summary=constraint.get("text", node_id), metadata={"profile_id": profile_id, "project_id": project_id, "source": constraint.get("source")}))
+                    edges.append(_edge(f"edge:{summary_node}:constrains:{node_id}", summary_node, node_id, "constrains"))
+                for link in summary.get("graph_links", []):
+                    if link.get("source") and link.get("target") and link.get("type"):
+                        edges.append(_edge(f"edge:project-summary-link:{_slug(link['source'])}:{_slug(link['type'])}:{_slug(link['target'])}", link["source"], link["target"], link["type"], confidence=0.8))
+    return nodes, edges, warnings
+
+
+def _lineage_map_edges(repo_root: Path, nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    existing_paths = {node.get("path") for node in nodes if node.get("path") and (repo_root / str(node.get("path"))).exists()}
+    for node in nodes:
+        path = node.get("path") or node.get("metadata", {}).get("path")
+        if path in existing_paths:
+            artifact_id = f"artifact:{path}"
+            if any(candidate.get("id") == artifact_id for candidate in nodes):
+                out.append(_edge(f"edge:{_slug(node['id'])}:maps-to-log", node["id"], artifact_id, "maps_to_log", metadata={"path": path}))
+    if not out:
+        out.append(_edge("edge:lineage-index:maps-to-log-placeholder", "artifact:artifacts/v2/lineage/log-index.json", "artifact:v2-generated-artifacts", "maps_to_log", confidence=0.5, metadata={"reason": "lineage index maps graph refs to local logs when generated"}))
+    return out
 
 
 
@@ -266,6 +372,10 @@ def build_governance_graph(repo_root: Path | str) -> dict[str, Any]:
         _artifact_node(repo_root, "artifacts/v2/dashboard/index.html", "dashboard HTML", "report"),
         _artifact_node(repo_root, "artifacts/v2/sessions/session-index.json", "session index", "knowledge_source"),
         _artifact_node(repo_root, "artifacts/v2/pipeline-run.json", "v2 pipeline run", "report"),
+        _artifact_node(repo_root, "artifacts/v2/profiles/profile-index.json", "profile index", "knowledge_source"),
+        _artifact_node(repo_root, "artifacts/v2/projects/general/harness-self-governance/project-manifest.json", "project manifest", "knowledge_source"),
+        _artifact_node(repo_root, "artifacts/v2/projects/general/harness-self-governance/project-summary.json", "project summary", "project_summary"),
+        _artifact_node(repo_root, "artifacts/v2/lineage/log-index.json", "lineage log index", "knowledge_source"),
     ]
 
     edges = [
@@ -279,6 +389,9 @@ def build_governance_graph(repo_root: Path | str) -> dict[str, Any]:
         _edge("edge:pipeline-v2-generated-dashboard", "pipeline:v2.0-rc", "artifact:artifacts/v2/dashboard/index.html", "generated"),
         _edge("edge:pipeline-v2-generated-session-index", "pipeline:v2.0-rc", "artifact:artifacts/v2/sessions/session-index.json", "generated"),
         _edge("edge:pipeline-v2-generated-run", "pipeline:v2.0-rc", "artifact:artifacts/v2/pipeline-run.json", "generated"),
+        _edge("edge:pipeline-v2-generated-profile-index", "pipeline:v2.0-rc", "artifact:artifacts/v2/profiles/profile-index.json", "generated"),
+        _edge("edge:pipeline-v2-generated-project-manifest", "pipeline:v2.0-rc", "artifact:artifacts/v2/projects/general/harness-self-governance/project-manifest.json", "generated"),
+        _edge("edge:pipeline-v2-generated-lineage-index", "pipeline:v2.0-rc", "artifact:artifacts/v2/lineage/log-index.json", "generated"),
         _edge("edge:proposal-validated-by-gates", "proposal:v1.1-reviewed-apply-plan", "gate:approval", "validates"),
         _edge("edge:gates-block-destructive", "gate:approval", "requirement:no-destructive-apply", "blocks"),
         _edge("edge:gates-block-graph-mutation", "gate:approval", "requirement:no-graph-mutation", "blocks"),
@@ -299,10 +412,16 @@ def build_governance_graph(repo_root: Path | str) -> dict[str, Any]:
     nodes.extend(capability_nodes)
     edges.extend(capability_edges)
 
+    profile_nodes, profile_edges, profile_warnings = _profile_project_nodes_and_edges(repo_root)
+    nodes.extend(profile_nodes)
+    edges.extend(profile_edges)
+    warnings.extend(profile_warnings)
+
     session_nodes, session_edges, session_warnings = _session_nodes_and_edges(repo_root)
     nodes.extend(session_nodes)
     edges.extend(session_edges)
     warnings.extend(session_warnings)
+    edges.extend(_lineage_map_edges(repo_root, nodes, edges))
 
     nodes = sorted(nodes, key=lambda item: item["id"])
     edges = sorted(edges, key=lambda item: item["id"])

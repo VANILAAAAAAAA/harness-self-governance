@@ -70,6 +70,19 @@ def test_dashboard_file_generated_as_two_page_graph_logs_app() -> None:
         "locateLogPath",
         "viewSelectedGraphInLogs",
         "No direct log mapping",
+        "Profile: general",
+        "profile-switcher",
+        "data-profile-id=\"general\"",
+        "data-profile-id=\"ehrlab\"",
+        "Project: harness-self-governance",
+        "project-selector",
+        "profile_index",
+        "projects",
+        "lineage_index",
+        "mappingStatusForRef",
+        "preferred_path",
+        "view_in_logs_requires_mapping",
+        "No projects archived for this profile yet",
         "Graph diagnostic summary",
         "graph_summary",
         "Traversal hubs",
@@ -149,7 +162,13 @@ def test_dashboard_embeds_graph_logs_sessions_and_safety_data() -> None:
     assert data["graph_summary"]["hubs"]
     assert "tool" in data["graph_filter_types"]
     assert "knowledge_source" in data["graph_filter_types"]
-    assert data["log_groups"] == ["artifacts", "sessions", "proposals", "policies", "provenance", "system"]
+    assert data["log_groups"] == ["profiles", "projects", "sessions", "summaries", "decisions", "requirements", "artifacts", "policies", "provenance", "system"]
+    assert data["profile_index"]["active_profile"] == "general"
+    assert {profile["profile_id"] for profile in data["profile_index"]["profiles"]} >= {"general", "ehrlab"}
+    assert data["projects"]["default_project"] == "harness-self-governance"
+    assert data["lineage_index"]["schema_version"] == "2.0"
+    assert data["pipeline_status"].get("llm_hub_api_enabled") is False
+    assert data["pipeline_status"].get("agent_triggered_archive") is True
 
 
 def test_collect_file_inventory_handles_missing_dirs_and_previews_json(tmp_path: Path) -> None:
