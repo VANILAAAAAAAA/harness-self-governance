@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path
 
-from graph_harness_maintain.dashboard import build_dashboard, build_dashboard_data, collect_file_inventory, render_preview
+from graph_harness_maintain.dashboard import build_dashboard, build_dashboard_data, build_graph_summary, collect_file_inventory, render_preview
 
 ROOT = Path(__file__).parents[1]
 
@@ -54,10 +54,44 @@ def test_dashboard_file_generated_as_two_page_graph_logs_app() -> None:
         "filterNodesByType",
         "clearGraphFilters",
         "activeGraphTypes",
+        "activeEdgeTypes",
         "renderTypeFilters",
+        "renderEdgeFilters",
+        "filterEdgesByType",
+        "edge-filter-chips",
+        "edge-control",
+        "edge-hit",
+        "data-edge-id",
+        "data-node-id",
+        "role","button",
+        "tabindex",
+        "selectEdge(edgeId)",
+        "edgeLogPath",
+        "locateLogPath",
+        "viewSelectedGraphInLogs",
+        "No direct log mapping",
+        "Graph diagnostic summary",
+        "graph_summary",
+        "Traversal hubs",
+        "focus-hubs",
+        "data-graph-mode=\"overview\"",
+        "data-graph-mode=\"focus\"",
+        "data-graph-mode=\"full\"",
+        "activeGraphMode = 'overview'",
+        "setGraphMode('overview')",
+        "#logs-route.active",
+        "logs-scroll-hint",
+        "Use the File Explorer, Table, and Preview scrollbars",
+        "html, body",
+        "overflow:hidden",
+        "overflow:auto",
         "activeLogGroup",
         "selectLogGroup",
         "file-table-scroll",
+        "table-scroll-down",
+        "preview-scroll-down",
+        "withLineNumbers",
+        "scrollById",
         "toggleTheme",
         "startCanvasPan",
         "finishCanvasPan",
@@ -97,6 +131,11 @@ def test_dashboard_embeds_graph_logs_sessions_and_safety_data() -> None:
     assert "governance-graph.json" in html
     assert "session-index.json" in html
     assert data["graph_filter_types"]
+    assert data["edge_filter_types"]
+    assert data["graph_summary"]["node_count"] == len(data["graph"]["nodes"])
+    assert data["graph_summary"]["edge_count"] == len(data["graph"]["edges"])
+    assert data["graph_summary"]["diagnostics"]
+    assert data["graph_summary"]["hubs"]
     assert "tool" in data["graph_filter_types"]
     assert "knowledge_source" in data["graph_filter_types"]
     assert data["log_groups"] == ["artifacts", "sessions", "proposals", "policies", "provenance", "system"]
@@ -140,3 +179,27 @@ def test_dashboard_data_is_deterministic_except_timestamps() -> None:
             item["modified"] = "normalized"
             item["modified_epoch"] = 0
     assert first == second
+
+
+def test_build_graph_summary_reports_density_hubs_and_broken_edges() -> None:
+    graph = {
+        "nodes": [
+            {"id": "a", "type": "tool", "label": "A"},
+            {"id": "b", "type": "policy", "label": "B"},
+            {"id": "c", "type": "report", "label": "C"},
+        ],
+        "edges": [
+            {"id": "e1", "source": "a", "target": "b", "type": "governed_by"},
+            {"id": "e2", "source": "a", "target": "c", "relation": "generated"},
+            {"id": "e3", "source": "a", "target": "missing", "type": "references"},
+        ],
+    }
+
+    summary = build_graph_summary(graph)
+
+    assert summary["node_count"] == 3
+    assert summary["edge_count"] == 3
+    assert summary["broken_edge_count"] == 1
+    assert summary["edge_type_counts"]["generated"] == 1
+    assert summary["hubs"][0]["id"] == "a"
+    assert summary["diagnostics"]
