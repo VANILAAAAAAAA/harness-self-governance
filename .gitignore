@@ -62,3 +62,7 @@ state.db
 Thumbs.db
 .vscode/
 .idea/
+
+# Local concept/reference images
+Concept map*.png
+Concept map*.png:Zone.Identifier
