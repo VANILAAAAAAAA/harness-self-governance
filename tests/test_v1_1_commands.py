@@ -7,12 +7,20 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
-ENV = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
 PY = sys.executable
 
 
+def _env() -> dict[str, str]:
+    env = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
+    env.setdefault("GIT_AUTHOR_NAME", "VANILAAAAAAAA")
+    env.setdefault("GIT_AUTHOR_EMAIL", "xchen247@uw.edu")
+    env.setdefault("GIT_COMMITTER_NAME", "VANILAAAAAAAA")
+    env.setdefault("GIT_COMMITTER_EMAIL", "xchen247@uw.edu")
+    return env
+
+
 def _run(*args: str) -> subprocess.CompletedProcess:
-    return subprocess.run([PY, "-m", "graph_harness_maintain", *args], cwd=ROOT, text=True, capture_output=True, env=ENV)
+    return subprocess.run([PY, "-m", "graph_harness_maintain", *args], cwd=ROOT, text=True, capture_output=True, env=_env())
 
 
 def _json(stdout: str) -> dict:
