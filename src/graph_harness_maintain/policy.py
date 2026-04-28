@@ -4,8 +4,18 @@ from pathlib import Path
 import re
 from .schema import PolicyDecision, GraphNode
 
-SAFE_COMMANDS = {"validate", "inspect", "retrieve", "export-sanitized-dry-run", "storage-audit", "raw-archive-proposal"}
-BLOCKED_COMMANDS = {"raw-archive-apply"}
+SAFE_COMMANDS = {
+    "validate",
+    "inspect",
+    "retrieve",
+    "export-sanitized-dry-run",
+    "storage-audit",
+    "raw-archive-proposal",
+    "proposal",
+    "templates",
+    "adapter-report",
+}
+BLOCKED_COMMANDS = {"raw-archive-apply", "apply"}
 BLOCKED_OUTPUT_NAMES = {"graph.jsonl", "events.jsonl", "shared-skills.jsonl", "shared-tools.jsonl", "graph.schema.yaml"}
 SENSITIVE_LABELS = {"phi_or_patient_level", "credential"}
 
@@ -50,9 +60,6 @@ class Policy:
 def looks_absolute_path(value: str) -> bool:
     if not isinstance(value, str) or not value:
         return False
-    # Fail closed for anchored or embedded absolute path forms. This deliberately
-    # catches unknown POSIX roots in addition to known sensitive roots because a
-    # sanitizer should not rely on enumerating every private mount point.
     patterns = [
         r"file:///(?:[A-Za-z]:/|/)?[^\s\"']+",
         r"(?:^|[\s\"'=:\[,])/(?:home|mnt|tmp|Users)/[^\s\"'\],}]+",

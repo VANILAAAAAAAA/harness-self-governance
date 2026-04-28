@@ -8,14 +8,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .adapters import ArtifactStoreAdapter, FileTreeAdapter, GitRepoAdapter
+from .adapter_report import write_adapter_report
 from .evidence import write_evidence_index
-from .gates import GATE_BLOCK_EXIT_CODE, write_gate_check
+from .gates import write_gate_check
 from .git_state import write_git_state
 from .identity import IDENTITY_FAIL_EXIT_CODE, run_identity_check
 from .leak_scan import LEAK_SCAN_FAIL_EXIT_CODE, write_leak_scan
-from .provenance import build_current_state, write_current_state
+from .proposals import validate_proposal_file, write_default_proposal
+from .provenance import append_local_test_event, build_current_state, write_current_state
 from .release_audit import write_release_audit
-from .report import write_pipeline_report
+from .report import NOT_EXECUTED, write_pipeline_report, write_v1_1_pipeline_report
+from .templates import validate_templates
 
 
 PASS = 0
@@ -231,5 +234,163 @@ def run_local_rc(repo_root: Path, strict: bool = False, ci_mode: bool = False, s
         "strict": strict,
     }
     write_pipeline_report(repo_root, artifacts_root / "v1-local-rc-report.md", result, git_state, identity, release_audit, gates, adapter, evidence, provenance, tests, smoke, leak_scan)
+    _write_json(artifacts_root / "pipeline-run.json", result)
+    return result
+
+
+def run_v1_1_rc(repo_root: Path, strict: bool = False, ci_mode: bool = False, stage_overrides: dict | None = None) -> dict:
+    repo_root = repo_root.resolve()
+    artifacts_root = repo_root / "artifacts" / "v1.1"
+    provenance_root = artifacts_root / "provenance"
+    policy_path = repo_root / "policies" / "approval-gates.yaml"
+
+    identity = run_identity_check(repo_root, artifacts_root / "identity-check.json", ci_mode=ci_mode)
+    git_state = write_git_state(repo_root, artifacts_root / "git-state.json")
+    release_audit = write_release_audit(repo_root, artifacts_root / "open-source-surface.json")
+    gates = write_gate_check(repo_root, artifacts_root / "approval-gate-check.json", policy_path)
+    proposal = write_default_proposal(repo_root, artifacts_root / "proposals" / "reviewed-apply-plan.json", title="v1.1 RC reviewed apply plan")
+    proposal_validation = validate_proposal_file(repo_root, artifacts_root / "proposals" / "reviewed-apply-plan.json", artifacts_root / "proposal-validation.json")
+    templates = validate_templates(repo_root, artifacts_root / "template-validation.json")
+    adapter = write_adapter_report(repo_root, artifacts_root / "adapter-report.json", artifacts_root / "adapter-report.md")
+    provenance_append = append_local_test_event(repo_root, provenance_root / "local-test-events.jsonl", provenance_root / "local-append-report.json", note="v1.1 RC local provenance append test")
+    tests = run_tests(repo_root, artifacts_root / "test-results.json")
+    smoke = run_smoke_tests(repo_root, artifacts_root / "smoke-tests.json")
+    leak_scan = write_leak_scan(repo_root, artifacts_root / "leak-scan.json")
+
+    stage_results = {
+        "identity": identity,
+        "git_state": git_state,
+        "release_audit": release_audit,
+        "gates": gates,
+        "proposal": proposal,
+        "proposal_validation": proposal_validation,
+        "templates": templates,
+        "adapter": adapter,
+        "local_provenance_append": provenance_append,
+        "tests": tests,
+        "smoke": smoke,
+        "leak_scan": leak_scan,
+        "provenance": {"status": "PASS", "path": "artifacts/v1.1/provenance/current-state.json"},
+        "report": {"status": "PASS", "path": "artifacts/v1.1/v1.1-rc-report.md"},
+    }
+    if stage_overrides:
+        for name, override in stage_overrides.items():
+            stage_results.setdefault(name, {}).update(override)
+
+    evidence = write_evidence_index(repo_root, artifacts_root / "evidence-index.json", stage_results)
+    provenance_state = build_current_state(
+        repo_name="harness-self-governance",
+        branch=git_state.get("branch") or "unknown",
+        head=git_state.get("head") or "unknown",
+        identity=identity,
+        inputs=["README.md", "pyproject.toml", "policies/approval-gates.yaml", "artifacts/v1.1/proposals/reviewed-apply-plan.json", "templates/"],
+        outputs=["artifacts/v1.1/evidence-index.json", "artifacts/v1.1/v1.1-rc-report.md", "artifacts/v1.1/provenance/local-test-events.jsonl"],
+        approval_gates=gates,
+        validation={
+            "proposal_validation": proposal_validation["status"],
+            "templates": templates["status"],
+            "adapter_report": adapter["status"],
+            "local_provenance_append": provenance_append["status"],
+            "tests": tests["status"],
+            "package_import": smoke["package_import"],
+            "cli_smoke": smoke["cli_smoke"],
+            "leak_scan": leak_scan["status"],
+        },
+        pipeline="v1.1-rc",
+        schema_version="1.1",
+    )
+    provenance = write_current_state(repo_root, provenance_root / "current-state.json", provenance_state)
+    stage_results["provenance"] = provenance
+
+    blockers: list[str] = []
+    warnings: list[str] = []
+    if identity["status"] == "FAIL":
+        blockers.extend(identity["blockers"])
+    elif identity["warnings"]:
+        warnings.extend(identity["warnings"])
+    if release_audit["status"] == "FAIL":
+        blockers.extend(release_audit["blockers"])
+    if gates["status"] == "FAIL":
+        blockers.append("approval gate policy failed to load")
+    for stage_name, stage in [
+        ("proposal create", proposal),
+        ("proposal validation", proposal_validation),
+        ("template validation", templates),
+        ("adapter report", adapter),
+        ("local provenance append", provenance_append),
+    ]:
+        if stage.get("status") != "PASS":
+            blockers.extend(stage.get("blockers") or [f"{stage_name} failed"])
+        warnings.extend(stage.get("warnings", []))
+    if tests["status"] != "PASS":
+        blockers.append("pytest failed")
+    if smoke["status"] != "PASS":
+        blockers.append("package or CLI smoke tests failed")
+    if leak_scan["status"] != "PASS":
+        blockers.append("leak scan found blocking issues")
+    if evidence["status"] != "PASS":
+        blockers.append("evidence index contains failed required claims")
+
+    status = "PASS"
+    if blockers:
+        status = "FAIL" if strict or any(item for item in blockers) else "BLOCKED"
+    elif warnings:
+        status = "PASS_WITH_WARNINGS"
+
+    exit_code = PASS
+    if identity["status"] == "FAIL":
+        exit_code = IDENTITY_FAIL_EXIT_CODE
+    elif gates["status"] == "FAIL":
+        exit_code = CONFIG_FAIL
+    elif leak_scan["status"] != "PASS":
+        exit_code = LEAK_SCAN_FAIL_EXIT_CODE
+    elif tests["status"] != "PASS":
+        exit_code = TESTS_FAIL
+    elif smoke["status"] != "PASS":
+        exit_code = PACKAGE_SMOKE_FAIL
+    elif blockers:
+        exit_code = FAIL
+
+    result = {
+        "generated_at": _utc_now(),
+        "schema_version": "1.1",
+        "status": status,
+        "release_ready_local": not blockers,
+        "reviewed_apply_gated": True,
+        "apply_executed": False,
+        "remote_publication_allowed": False,
+        "destructive_operations_allowed": False,
+        "provenance_upgrade_allowed": False,
+        "local_provenance_append_test_allowed": True,
+        "human_approval_required": gates.get("human_approval_required", []),
+        "blockers": blockers,
+        "warnings": warnings,
+        "artifacts": [
+            "artifacts/v1.1/identity-check.json",
+            "artifacts/v1.1/git-state.json",
+            "artifacts/v1.1/open-source-surface.json",
+            "artifacts/v1.1/approval-gate-check.json",
+            "artifacts/v1.1/proposal-manifest.schema.json",
+            "artifacts/v1.1/proposals/reviewed-apply-plan.json",
+            "artifacts/v1.1/proposal-validation.json",
+            "artifacts/v1.1/template-validation.json",
+            "artifacts/v1.1/adapter-report.json",
+            "artifacts/v1.1/adapter-report.md",
+            "artifacts/v1.1/provenance/local-test-events.jsonl",
+            "artifacts/v1.1/provenance/local-append-report.json",
+            "artifacts/v1.1/provenance/current-state.json",
+            "artifacts/v1.1/evidence-index.json",
+            "artifacts/v1.1/test-results.json",
+            "artifacts/v1.1/smoke-tests.json",
+            "artifacts/v1.1/leak-scan.json",
+            "artifacts/v1.1/v1.1-rc-report.md",
+            "artifacts/v1.1/pipeline-run.json",
+        ],
+        "not_executed_actions": NOT_EXECUTED,
+        "exit_code": exit_code,
+        "ci_mode": ci_mode,
+        "strict": strict,
+    }
+    write_v1_1_pipeline_report(repo_root, artifacts_root / "v1.1-rc-report.md", result, git_state, identity, release_audit, gates, proposal, proposal_validation, templates, adapter, provenance_append, provenance, evidence, tests, smoke, leak_scan)
     _write_json(artifacts_root / "pipeline-run.json", result)
     return result
