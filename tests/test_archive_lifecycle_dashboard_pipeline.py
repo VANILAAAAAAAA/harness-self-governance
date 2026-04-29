@@ -23,6 +23,11 @@ def test_v2_pipeline_reports_archive_lifecycle_governance_fields() -> None:
     assert data["live_session_boundary_supported"] is True
     assert data["archive_gate_available"] is True
     assert data["archive_maintenance_available"] is True
+    assert data["archive_trigger_policy_available"] is True
+    assert data["archive_trigger_report_available"] is True
+    assert data["archive_auto_apply_enabled"] is False
+    assert data["user_requested_archive_supported"] is True
+    assert data["milestone_archive_recommendation_supported"] is True
     assert data["live_session_priority"] is True
     assert data["pending_update_supported"] is True
     assert data["compiled_candidate_requires_review"] is True
@@ -38,6 +43,7 @@ def test_v2_pipeline_reports_archive_lifecycle_governance_fields() -> None:
         "artifacts/v2/maintenance/archive-gate-report.json",
         "artifacts/v2/maintenance/archive-maintenance-report.json",
         "artifacts/v2/maintenance/archive-maintenance-proposal.json",
+        "artifacts/v2/maintenance/archive-trigger-report.json",
     ]:
         assert rel in data["artifacts"]
         assert (ROOT / rel).exists()
@@ -56,6 +62,10 @@ def test_dashboard_embeds_archive_lifecycle_summary_in_graph_page() -> None:
     assert "stale summaries" in html.lower()
     assert "archive quality" in html.lower()
     assert "raw sessions: forensic only" in html.lower()
+    assert "trigger policy: active" in html.lower()
+    assert "auto archive: disabled" in html.lower()
+    assert "manual archive: required" in html.lower()
+    assert "latest recommendation count" in html.lower()
     assert "archive-lifecycle-summary" in html
 
     lifecycle = data["archive_lifecycle"]
@@ -63,6 +73,10 @@ def test_dashboard_embeds_archive_lifecycle_summary_in_graph_page() -> None:
     assert lifecycle["raw_sessions_default_read"] is False
     assert lifecycle["raw_sessions_policy"] == "explicit_forensic_only"
     assert lifecycle["compiled_candidate_requires_review"] is True
+    assert lifecycle["trigger_policy_active"] is True
+    assert lifecycle["archive_auto_apply_enabled"] is False
+    assert lifecycle["manual_archive_required"] is True
+    assert lifecycle["latest_recommendation_count"] >= 0
     assert lifecycle["pending_updates_count"] >= 0
     assert lifecycle["context_gaps_count"] >= 0
     assert lifecycle["stale_summaries_count"] >= 0
@@ -78,5 +92,9 @@ def test_dashboard_data_exposes_archive_lifecycle_projection() -> None:
     assert lifecycle["summary_path"] == "artifacts/v2/maintenance/archive-maintenance-report.json"
     assert lifecycle["proposal_path"] == "artifacts/v2/maintenance/archive-maintenance-proposal.json"
     assert lifecycle["gate_path"] == "artifacts/v2/maintenance/archive-gate-report.json"
+    assert lifecycle["trigger_report_path"] == "artifacts/v2/maintenance/archive-trigger-report.json"
     assert pipeline_status["archive_gate_available"] is True
     assert pipeline_status["archive_maintenance_available"] is True
+    assert pipeline_status["archive_trigger_policy_available"] is True
+    assert pipeline_status["archive_trigger_report_available"] is True
+    assert pipeline_status["archive_auto_apply_enabled"] is False

@@ -20,14 +20,15 @@ Current boundary:
 
 - the agent compiles milestone knowledge into structured JSON
 - `agent-graph archive-session` merges the structured JSON deterministically
-- `agent-graph archive-gate report` and `agent-graph maintenance report` expose archive lifecycle state without mutating memory automatically
+- `agent-graph archive-gate report`, `agent-graph maintenance report`, and `agent-graph triggers report` expose archive lifecycle state without mutating memory automatically
 - the dashboard reads exported artifacts only
 - raw sessions remain local-only source material and last-resort context
 
 Deferred until later work:
 
-- automatic archive triggers
-- stale summary detection
+- automatic archive execution
+- trigger policy driven auto-archive
+- stale summary repair loops
 - context gap repair loops
 - pending update review automation
 
@@ -76,6 +77,7 @@ agent-graph archive-gate report --repo . --memory-root "$TMP_MEM"
 agent-graph maintenance report --repo . --memory-root "$TMP_MEM"
 agent-graph maintenance validate --repo . --memory-root "$TMP_MEM"
 agent-graph maintenance propose --repo . --memory-root "$TMP_MEM"
+agent-graph triggers report --repo . --memory-root "$TMP_MEM"
 agent-graph validate --repo . --memory-root "$TMP_MEM"
 agent-graph export --repo . --memory-root "$TMP_MEM"
 ```
@@ -87,6 +89,7 @@ agent-graph export --repo . --memory-root "$TMP_MEM"
 - `artifacts/v2/maintenance/archive-gate-report.json`
 - `artifacts/v2/maintenance/archive-maintenance-report.json`
 - `artifacts/v2/maintenance/archive-maintenance-proposal.json`
+- `artifacts/v2/maintenance/archive-trigger-report.json`
 - `artifacts/v2/projects/general/harness-self-governance/project-manifest.json`
 - `artifacts/v2/projects/general/harness-self-governance/project-summary.json`
 - `artifacts/v2/projects/general/harness-self-governance/decision-ledger.json`

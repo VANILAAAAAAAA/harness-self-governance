@@ -56,7 +56,7 @@ python -m graph_harness_maintain pipeline v1.1-rc --strict
 
 v2.0 promotes `graph-harness-maintain` from a repo-local dashboard into the reference implementation and dashboard/export target for a reusable global Agent Memory Graph protocol. The default context order is graph-first: global graph, active profile, active project, project summary, decision ledger, requirements, constraints, lineage index, mapped logs/artifacts, and raw sessions last.
 
-Use the portable `agent-graph` CLI to initialize repo manifests, bootstrap temporary memory roots, validate graph-governed context, build the budgeted traversal index, route task context, archive agent-compiled session JSON, and export repo-local dashboard artifacts:
+Use the portable `agent-graph` CLI to initialize repo manifests, bootstrap temporary memory roots, validate graph-governed context, build the budgeted traversal index, route task context, evaluate archive trigger policy, archive agent-compiled session JSON, and export repo-local dashboard artifacts:
 
 ```bash
 agent-graph init-repo --repo . --profile general --project harness-self-governance
@@ -64,6 +64,7 @@ TMP_MEM=$(mktemp -d)
 agent-graph bootstrap --repo . --memory-root "$TMP_MEM" --context-budget fast
 agent-graph build-index --repo . --memory-root "$TMP_MEM"
 agent-graph route --repo . --query "view in logs lineage mapping" --memory-root "$TMP_MEM" --context-budget fast
+agent-graph triggers report --repo . --memory-root "$TMP_MEM"
 agent-graph validate --repo . --memory-root "$TMP_MEM"
 agent-graph export --repo . --memory-root "$TMP_MEM"
 ```
@@ -86,6 +87,7 @@ The first production-quality manual archive pass is committed as curated example
 - `docs/examples/agent-memory-graph/harness-self-governance/`
 - `docs/agent/manual-session-archive-bootstrap.md`
 - `docs/agent/archive-lifecycle-governance.md`
+- `docs/agent/archive-trigger-policy.md`
 - `docs/agent/live-session-vs-compiled-memory-boundary.md`
 
 These files are reviewable `compiled-session` inputs for `agent-graph archive-session`. They seed real project knowledge into the Agent Memory Graph without committing raw sessions, screenshots, or generated `artifacts/v2/` outputs.

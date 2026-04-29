@@ -5,6 +5,7 @@ from typing import Any
 
 from .archive_gate import write_archive_gate_report
 from .archive_quality import compiled_session_example_dir, validate_compiled_session_examples
+from .archive_triggers import write_archive_trigger_report
 from .context_gaps import list_context_gaps
 from .repo_adapter import read_repo_manifest
 from .schemas import SCHEMA_VERSION, deterministic_write_json, read_json, resolve_memory_root
@@ -38,6 +39,9 @@ def build_archive_maintenance_report(repo_root: Path | str, memory_root: Path | 
     gate = read_json(memory_root / "reports" / "archive-gate-report.json")
     if not gate:
         gate = read_json(Path(write_archive_gate_report(repo_root, memory_root)["report_path"]))
+    trigger_report = read_json(memory_root / "reports" / "archive-trigger-report.json")
+    if not trigger_report:
+        trigger_report = read_json(Path(write_archive_trigger_report(repo_root, memory_root)["report_path"]))
     quality = validate_compiled_session_examples(compiled_session_example_dir(repo_root))
     gaps = list_context_gaps(repo_root, memory_root)
     stale_summaries_count = _stale_summaries_count(memory_root, profile_id, project_id)
@@ -54,6 +58,10 @@ def build_archive_maintenance_report(repo_root: Path | str, memory_root: Path | 
         "stale_summaries_count": stale_summaries_count,
         "compiled_candidates_count": gate.get("counts", {}).get("compiled_candidate", 0),
         "forensic_only_count": gate.get("counts", {}).get("forensic_only", 0),
+        "trigger_policy_active": True,
+        "archive_auto_apply_enabled": False,
+        "manual_archive_required": True,
+        "latest_recommendation_count": trigger_report.get("latest_recommendation_count", 0),
         "live_session_priority": True,
         "pending_update_supported": True,
         "compiled_candidate_requires_review": True,
@@ -62,6 +70,7 @@ def build_archive_maintenance_report(repo_root: Path | str, memory_root: Path | 
         "raw_sessions_required": False,
         "quality": quality,
         "archive_gate": gate,
+        "archive_trigger_report": trigger_report,
         "context_gaps": gaps.get("gaps", []),
         "warnings": [],
         "blockers": quality.get("blockers", []),

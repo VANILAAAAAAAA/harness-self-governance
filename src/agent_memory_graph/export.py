@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from .archive_triggers import write_archive_trigger_report
 from .lineage import write_global_lineage
 from .profiles import build_profile_index, ensure_profile
 from .projects import ensure_project, load_project_bundle
@@ -97,6 +98,7 @@ def build_global_graph(memory_root: Path, profile_id: str, project_id: str) -> d
     graph['nodes'] = sorted(nodes, key=lambda item: item['id'])
     graph['edges'] = sorted(edges, key=lambda item: item['id'])
     maintenance = read_json(memory_root / 'reports' / 'archive-maintenance-report.json')
+    trigger_report = read_json(memory_root / 'reports' / 'archive-trigger-report.json')
     graph['summary'] = {
         'profile_support': True,
         'project_support': True,
@@ -106,10 +108,13 @@ def build_global_graph(memory_root: Path, profile_id: str, project_id: str) -> d
         'live_session_boundary_supported': True,
         'archive_gate_available': (memory_root / 'reports' / 'archive-gate-report.json').exists(),
         'archive_maintenance_available': bool(maintenance),
+        'archive_trigger_policy_available': True,
+        'archive_trigger_report_available': bool(trigger_report),
         'repo_context_manifest_available': True,
         'agent_graph_cli_available': True,
         'project_role': manifest.get('role'),
         'archive_quality_status': maintenance.get('archive_quality_status', 'unknown'),
+        'latest_archive_recommendation_count': trigger_report.get('latest_recommendation_count', 0),
     }
     return graph
 
@@ -148,6 +153,7 @@ def export_repo_projection(repo_root: Path | str, memory_root: Path | str) -> di
     profile_id = manifest['profile']
     project_id = manifest['project']
     bundle = load_project_bundle(memory_root, profile_id, project_id)
+    write_archive_trigger_report(repo_root, memory_root)
     graph = write_global_graph(memory_root, profile_id, project_id)
     lineage = write_global_lineage(memory_root, profile_id, project_id)
     profile_index = build_profile_index(memory_root)
@@ -177,6 +183,7 @@ def export_repo_projection(repo_root: Path | str, memory_root: Path | str) -> di
         'archive-gate-report.json',
         'archive-maintenance-report.json',
         'archive-maintenance-proposal.json',
+        'archive-trigger-report.json',
     ):
         source = memory_root / 'reports' / name
         if source.exists():

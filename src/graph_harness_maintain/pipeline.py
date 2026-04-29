@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 from agent_memory_graph.archive import archive_session
 from agent_memory_graph.archive_gate import write_archive_gate_report
 from agent_memory_graph.archive_quality import compiled_session_example_dir
+from agent_memory_graph.archive_triggers import write_archive_trigger_report
 from agent_memory_graph.artifacts import build_context_router_artifacts
 from agent_memory_graph.bootstrap import bootstrap_repo as bootstrap_agent_graph_repo, validate_repo as validate_agent_graph_repo
 from agent_memory_graph.context_index import build_context_index
@@ -487,6 +488,7 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
         archive_maintenance = write_archive_maintenance_report(repo_root, temp_memory_root)
         archive_maintenance_validation = validate_archive_maintenance(repo_root, temp_memory_root)
         archive_maintenance_proposal = generate_archive_maintenance_proposal(repo_root, temp_memory_root)
+        archive_trigger_report = write_archive_trigger_report(repo_root, temp_memory_root)
         memory_graph_export = export_repo_projection(repo_root, temp_memory_root)
         context_router_artifacts = build_context_router_artifacts(repo_root, temp_memory_root, artifacts_root / "context")
     governance_graph = write_governance_graph(repo_root, artifacts_root / "graph" / "governance-graph.json")
@@ -506,6 +508,7 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
         "archive_maintenance": archive_maintenance,
         "archive_maintenance_validation": archive_maintenance_validation,
         "archive_maintenance_proposal": archive_maintenance_proposal,
+        "archive_trigger_report": archive_trigger_report,
         "memory_graph_export": memory_graph_export,
         "context_router_artifacts": context_router_artifacts,
         "governance_graph": governance_graph,
@@ -564,6 +567,11 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
         "live_session_boundary_supported": True,
         "archive_gate_available": archive_gate.get("status") == "PASS",
         "archive_maintenance_available": archive_maintenance.get("status") in {"PASS", "PASS_WITH_WARNINGS"},
+        "archive_trigger_policy_available": True,
+        "archive_auto_apply_enabled": False,
+        "archive_trigger_report_available": archive_trigger_report.get("status") == "PASS",
+        "user_requested_archive_supported": True,
+        "milestone_archive_recommendation_supported": True,
         "live_session_priority": True,
         "pending_update_supported": True,
         "compiled_candidate_requires_review": True,
@@ -594,6 +602,7 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
             "artifacts/v2/maintenance/archive-gate-report.json",
             "artifacts/v2/maintenance/archive-maintenance-report.json",
             "artifacts/v2/maintenance/archive-maintenance-proposal.json",
+            "artifacts/v2/maintenance/archive-trigger-report.json",
             "artifacts/v2/pipeline-run.json",
         ],
         "exit_code": PASS if not blockers else FAIL,

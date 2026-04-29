@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .archive import archive_session
 from .archive_gate import classify_archive_input, write_archive_gate_report
+from .archive_triggers import evaluate_archive_trigger, write_archive_trigger_report
 from .bootstrap import bootstrap_repo, validate_repo
 from .context_gaps import list_context_gaps
 from .context_index import build_context_index
@@ -95,6 +96,16 @@ def build_parser() -> argparse.ArgumentParser:
     maintenance_propose = maintenance_sub.add_parser("propose", help="Write proposal-only archive maintenance actions")
     maintenance_propose.add_argument("--repo", default=".")
     maintenance_propose.add_argument("--memory-root", default=None)
+
+    triggers = sub.add_parser("triggers", help="Archive trigger policy evaluation and reporting")
+    triggers_sub = triggers.add_subparsers(dest="triggers_command", required=True)
+    triggers_evaluate = triggers_sub.add_parser("evaluate", help="Evaluate a trigger event into an archive recommendation")
+    triggers_evaluate.add_argument("--input", required=True)
+    triggers_evaluate.add_argument("--repo", default=".")
+    triggers_evaluate.add_argument("--memory-root", default=None)
+    triggers_report = triggers_sub.add_parser("report", help="Write archive trigger policy report")
+    triggers_report.add_argument("--repo", default=".")
+    triggers_report.add_argument("--memory-root", default=None)
     return parser
 
 
@@ -165,6 +176,15 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if report["status"] in {"PASS", "PASS_WITH_WARNINGS"} else 1
         if args.maintenance_command == "propose":
             report = generate_archive_maintenance_proposal(Path(args.repo), args.memory_root)
+            _print(report)
+            return 0 if report["status"] == "PASS" else 1
+    if args.command == "triggers":
+        if args.triggers_command == "evaluate":
+            report = evaluate_archive_trigger(args.input, Path(args.repo), args.memory_root)
+            _print(report)
+            return 0 if report["status"] == "PASS" else 1
+        if args.triggers_command == "report":
+            report = write_archive_trigger_report(Path(args.repo), args.memory_root)
             _print(report)
             return 0 if report["status"] == "PASS" else 1
     return 1

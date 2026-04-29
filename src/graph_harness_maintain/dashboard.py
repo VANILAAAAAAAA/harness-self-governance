@@ -348,6 +348,7 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
     archive_gate_path = maintenance_root / "archive-gate-report.json"
     archive_maintenance_path = maintenance_root / "archive-maintenance-report.json"
     archive_proposal_path = maintenance_root / "archive-maintenance-proposal.json"
+    archive_trigger_path = maintenance_root / "archive-trigger-report.json"
     if not profile_index_path.exists():
         write_profile_index(repo_root)
     if not project_manifest_path.exists():
@@ -356,7 +357,7 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         write_governance_graph(repo_root, governance_graph_path)
     if not lineage_path.exists():
         write_lineage_index(repo_root)
-    if not all(path.exists() for path in (context_index_path, router_samples_path, context_packets_path, context_gaps_path, pending_updates_path, archive_gate_path, archive_maintenance_path, archive_proposal_path)):
+    if not all(path.exists() for path in (context_index_path, router_samples_path, context_packets_path, context_gaps_path, pending_updates_path, archive_gate_path, archive_maintenance_path, archive_proposal_path, archive_trigger_path)):
         with TemporaryDirectory(prefix="agent-memory-graph-dashboard-") as temp_memory_root:
             bootstrap_agent_graph_repo(repo_root, temp_memory_root, context_budget="fast")
             _archive_curated_examples_for_dashboard(repo_root, temp_memory_root)
@@ -403,6 +404,14 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         "forensic_only_count": 0,
     }
     archive_proposal = _load_json(archive_proposal_path) or {"recommended_actions": []}
+    archive_trigger = _load_json(archive_trigger_path) or {
+        "trigger_policy_active": True,
+        "archive_auto_apply_enabled": False,
+        "manual_archive_required": True,
+        "latest_recommendation_count": 0,
+        "recommendation_count": 0,
+        "latest_recommendations": [],
+    }
     packet_samples = context_packets.get("samples", [])
     context_router = {
         "available": bool(context_index and context_packets),
@@ -433,6 +442,10 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         "raw_sessions_default_read": False,
         "raw_sessions_policy": "explicit_forensic_only",
         "compiled_candidate_requires_review": True,
+        "trigger_policy_active": archive_trigger.get("trigger_policy_active", True),
+        "archive_auto_apply_enabled": archive_trigger.get("archive_auto_apply_enabled", False),
+        "manual_archive_required": archive_trigger.get("manual_archive_required", True),
+        "latest_recommendation_count": archive_trigger.get("latest_recommendation_count", archive_trigger.get("recommendation_count", 0)),
         "pending_updates_count": archive_maintenance.get("pending_updates_count", archive_gate.get("counts", {}).get("pending_update", 0)),
         "compiled_candidates_count": archive_maintenance.get("compiled_candidates_count", archive_gate.get("counts", {}).get("compiled_candidate", 0)),
         "context_gaps_count": archive_maintenance.get("context_gaps_count", 0),
@@ -442,9 +455,11 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         "summary_path": "artifacts/v2/maintenance/archive-maintenance-report.json",
         "proposal_path": "artifacts/v2/maintenance/archive-maintenance-proposal.json",
         "gate_path": "artifacts/v2/maintenance/archive-gate-report.json",
+        "trigger_report_path": "artifacts/v2/maintenance/archive-trigger-report.json",
         "maintenance_report": archive_maintenance,
         "maintenance_proposal": archive_proposal,
         "archive_gate": archive_gate,
+        "archive_trigger_report": archive_trigger,
     }
     return {
         "schema_version": "2.0",
@@ -506,6 +521,10 @@ def _html(data: dict[str, Any]) -> str:
     archive = data.get("archive_lifecycle", {})
     archive_summary = "".join(
         [
+            '<span class="archive-chip">trigger policy: active</span>',
+            '<span class="archive-chip">auto archive: disabled</span>',
+            '<span class="archive-chip">manual archive: required</span>',
+            f'<span class="archive-chip">latest recommendation count: {archive.get("latest_recommendation_count", 0)}</span>',
             '<span class="archive-chip">live session: active</span>',
             f'<span class="archive-chip">pending updates: {archive.get("pending_updates_count", 0)}</span>',
             f'<span class="archive-chip">compiled candidates: {archive.get("compiled_candidates_count", 0)}</span>',
