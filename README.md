@@ -85,6 +85,8 @@ The first production-quality manual archive pass is committed as curated example
 
 - `docs/examples/agent-memory-graph/harness-self-governance/`
 - `docs/agent/manual-session-archive-bootstrap.md`
+- `docs/agent/archive-lifecycle-governance.md`
+- `docs/agent/live-session-vs-compiled-memory-boundary.md`
 
 These files are reviewable `compiled-session` inputs for `agent-graph archive-session`. They seed real project knowledge into the Agent Memory Graph without committing raw sessions, screenshots, or generated `artifacts/v2/` outputs.
 

@@ -8,10 +8,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from agent_memory_graph.archive import archive_session
+from agent_memory_graph.archive_gate import write_archive_gate_report
+from agent_memory_graph.archive_quality import compiled_session_example_dir
 from agent_memory_graph.artifacts import build_context_router_artifacts
 from agent_memory_graph.bootstrap import bootstrap_repo as bootstrap_agent_graph_repo, validate_repo as validate_agent_graph_repo
 from agent_memory_graph.context_index import build_context_index
 from agent_memory_graph.export import export_repo_projection
+from agent_memory_graph.maintenance import generate_archive_maintenance_proposal, validate_archive_maintenance, write_archive_maintenance_report
 from agent_memory_graph.repo_adapter import init_repo_manifest
 
 from .adapters import ArtifactStoreAdapter, FileTreeAdapter, GitRepoAdapter
@@ -61,6 +65,25 @@ def _run_command(command: list[str], repo_root: Path, env: dict[str, str] | None
 def _write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _archive_curated_compiled_sessions(repo_root: Path, memory_root: Path) -> dict:
+    example_dir = compiled_session_example_dir(repo_root)
+    archived = []
+    blockers = []
+    for path in sorted(example_dir.glob("compiled-session-*.json")):
+        result = archive_session(memory_root, DEFAULT_PROFILE_ID, DEFAULT_PROJECT_ID, path)
+        if result.get("status") != "PASS":
+            blockers.extend(result.get("blockers") or [f"failed to archive {path.name}"])
+        else:
+            archived.append(path.relative_to(repo_root).as_posix())
+    return {
+        "status": "PASS" if not blockers else "FAIL",
+        "archived_examples": archived,
+        "count": len(archived),
+        "warnings": [],
+        "blockers": blockers,
+    }
 
 
 def adapter_audit(repo_root: Path, artifact_path: Path) -> dict:
@@ -457,8 +480,13 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
     repo_manifest = init_repo_manifest(repo_root, DEFAULT_PROFILE_ID, DEFAULT_PROJECT_ID, force=False)
     with TemporaryDirectory(prefix="agent-memory-graph-") as temp_memory_root:
         bootstrap = bootstrap_agent_graph_repo(repo_root, temp_memory_root, context_budget="fast")
+        curated_archive = _archive_curated_compiled_sessions(repo_root, Path(temp_memory_root))
         agent_graph_validation = validate_agent_graph_repo(repo_root, temp_memory_root)
         context_index = build_context_index(repo_root, temp_memory_root)
+        archive_gate = write_archive_gate_report(repo_root, temp_memory_root)
+        archive_maintenance = write_archive_maintenance_report(repo_root, temp_memory_root)
+        archive_maintenance_validation = validate_archive_maintenance(repo_root, temp_memory_root)
+        archive_maintenance_proposal = generate_archive_maintenance_proposal(repo_root, temp_memory_root)
         memory_graph_export = export_repo_projection(repo_root, temp_memory_root)
         context_router_artifacts = build_context_router_artifacts(repo_root, temp_memory_root, artifacts_root / "context")
     governance_graph = write_governance_graph(repo_root, artifacts_root / "graph" / "governance-graph.json")
@@ -471,8 +499,13 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
         "sessions": sessions,
         "repo_manifest": repo_manifest,
         "bootstrap": bootstrap,
+        "curated_archive": curated_archive,
         "agent_graph_validation": agent_graph_validation,
         "context_index": context_index,
+        "archive_gate": archive_gate,
+        "archive_maintenance": archive_maintenance,
+        "archive_maintenance_validation": archive_maintenance_validation,
+        "archive_maintenance_proposal": archive_maintenance_proposal,
         "memory_graph_export": memory_graph_export,
         "context_router_artifacts": context_router_artifacts,
         "governance_graph": governance_graph,
@@ -528,6 +561,19 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
         "raw_sessions_policy": "explicit_forensic_only",
         "graph_traversal_context_protocol": True,
         "novelty_aware_context_policy": True,
+        "live_session_boundary_supported": True,
+        "archive_gate_available": archive_gate.get("status") == "PASS",
+        "archive_maintenance_available": archive_maintenance.get("status") in {"PASS", "PASS_WITH_WARNINGS"},
+        "live_session_priority": True,
+        "pending_update_supported": True,
+        "compiled_candidate_requires_review": True,
+        "forensic_raw_sessions_explicit_only": True,
+        "archive_quality_status": archive_maintenance_validation.get("archive_quality_status", "unknown"),
+        "pending_updates_count": archive_maintenance_validation.get("pending_updates_count", 0),
+        "context_gaps_count": archive_maintenance_validation.get("context_gaps_count", 0),
+        "stale_summaries_count": archive_maintenance_validation.get("stale_summaries_count", 0),
+        "compiled_candidates_count": archive_maintenance_validation.get("compiled_candidates_count", 0),
+        "forensic_only_count": archive_maintenance_validation.get("forensic_only_count", 0),
         "blockers": blockers,
         "warnings": warnings,
         "stages": stages,
@@ -545,6 +591,9 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
             "artifacts/v2/context/context-packets.json",
             "artifacts/v2/context/context-gaps.json",
             "artifacts/v2/context/pending-updates.json",
+            "artifacts/v2/maintenance/archive-gate-report.json",
+            "artifacts/v2/maintenance/archive-maintenance-report.json",
+            "artifacts/v2/maintenance/archive-maintenance-proposal.json",
             "artifacts/v2/pipeline-run.json",
         ],
         "exit_code": PASS if not blockers else FAIL,

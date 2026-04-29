@@ -5,9 +5,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
+from agent_memory_graph.archive import archive_session
+from agent_memory_graph.archive_quality import compiled_session_example_dir
 from agent_memory_graph.artifacts import build_context_router_artifacts
 from agent_memory_graph.bootstrap import bootstrap_repo as bootstrap_agent_graph_repo
 from agent_memory_graph.export import export_repo_projection
+from agent_memory_graph.maintenance import generate_archive_maintenance_proposal, write_archive_maintenance_report
 
 from .graph_export import write_governance_graph
 from .lineage_index import write_lineage_index
@@ -44,6 +47,11 @@ def _load_json(path: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
+
+
+def _archive_curated_examples_for_dashboard(repo_root: Path, memory_root: str) -> None:
+    for path in sorted(compiled_session_example_dir(repo_root).glob("compiled-session-*.json")):
+        archive_session(memory_root, DEFAULT_PROFILE_ID, DEFAULT_PROJECT_ID, path)
 
 
 def _safe_json_for_script(payload: dict[str, Any]) -> str:
@@ -331,11 +339,15 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
     project_manifest_path = repo_root / "artifacts" / "v2" / "projects" / DEFAULT_PROFILE_ID / DEFAULT_PROJECT_ID / "project-manifest.json"
     lineage_path = repo_root / "artifacts" / "v2" / "lineage" / "log-index.json"
     context_root = repo_root / "artifacts" / "v2" / "context"
+    maintenance_root = repo_root / "artifacts" / "v2" / "maintenance"
     context_index_path = context_root / "context-index.json"
     router_samples_path = context_root / "router-samples.json"
     context_packets_path = context_root / "context-packets.json"
     context_gaps_path = context_root / "context-gaps.json"
     pending_updates_path = context_root / "pending-updates.json"
+    archive_gate_path = maintenance_root / "archive-gate-report.json"
+    archive_maintenance_path = maintenance_root / "archive-maintenance-report.json"
+    archive_proposal_path = maintenance_root / "archive-maintenance-proposal.json"
     if not profile_index_path.exists():
         write_profile_index(repo_root)
     if not project_manifest_path.exists():
@@ -344,11 +356,15 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         write_governance_graph(repo_root, governance_graph_path)
     if not lineage_path.exists():
         write_lineage_index(repo_root)
-    if not all(path.exists() for path in (context_index_path, router_samples_path, context_packets_path, context_gaps_path, pending_updates_path)):
+    if not all(path.exists() for path in (context_index_path, router_samples_path, context_packets_path, context_gaps_path, pending_updates_path, archive_gate_path, archive_maintenance_path, archive_proposal_path)):
         with TemporaryDirectory(prefix="agent-memory-graph-dashboard-") as temp_memory_root:
             bootstrap_agent_graph_repo(repo_root, temp_memory_root, context_budget="fast")
+            _archive_curated_examples_for_dashboard(repo_root, temp_memory_root)
             export_repo_projection(repo_root, temp_memory_root)
             build_context_router_artifacts(repo_root, temp_memory_root, context_root)
+            write_archive_maintenance_report(repo_root, temp_memory_root)
+            generate_archive_maintenance_proposal(repo_root, temp_memory_root)
+            export_repo_projection(repo_root, temp_memory_root)
     session_path = ensure_session_index(repo_root)
     governance_graph = _ensure_dashboard_graph_context(_load_json(governance_graph_path))
     memory_graph = _ensure_dashboard_graph_context(_load_json(memory_graph_path)) if memory_graph_path.exists() else {"nodes": [], "edges": [], "summary": {"global_agent_memory_graph_supported": False}}
@@ -377,6 +393,16 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
     context_packets = _load_json(context_packets_path)
     context_gaps = _load_json(context_gaps_path) or {"schema_version": "2.0", "gaps": [], "count": 0}
     pending_updates = _load_json(pending_updates_path) or {"schema_version": "2.0", "items": [], "count": 0}
+    archive_gate = _load_json(archive_gate_path) or {"counts": {"pending_update": 0, "compiled_candidate": 0, "forensic_only": 0}}
+    archive_maintenance = _load_json(archive_maintenance_path) or {
+        "archive_quality_status": "unknown",
+        "pending_updates_count": 0,
+        "context_gaps_count": 0,
+        "stale_summaries_count": 0,
+        "compiled_candidates_count": 0,
+        "forensic_only_count": 0,
+    }
+    archive_proposal = _load_json(archive_proposal_path) or {"recommended_actions": []}
     packet_samples = context_packets.get("samples", [])
     context_router = {
         "available": bool(context_index and context_packets),
@@ -401,10 +427,30 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         "sample_queries": packet_samples,
         "read_order": ["global graph", "active profile", "active project", "project summary", "decision ledger", "requirements / constraints", "lineage index", "mapped logs / artifacts", "raw sessions last"],
     }
+    archive_lifecycle = {
+        "available": True,
+        "live_session_priority": True,
+        "raw_sessions_default_read": False,
+        "raw_sessions_policy": "explicit_forensic_only",
+        "compiled_candidate_requires_review": True,
+        "pending_updates_count": archive_maintenance.get("pending_updates_count", archive_gate.get("counts", {}).get("pending_update", 0)),
+        "compiled_candidates_count": archive_maintenance.get("compiled_candidates_count", archive_gate.get("counts", {}).get("compiled_candidate", 0)),
+        "context_gaps_count": archive_maintenance.get("context_gaps_count", 0),
+        "stale_summaries_count": archive_maintenance.get("stale_summaries_count", 0),
+        "forensic_only_count": archive_maintenance.get("forensic_only_count", archive_gate.get("counts", {}).get("forensic_only", 0)),
+        "archive_quality": archive_maintenance.get("archive_quality_status", "unknown"),
+        "summary_path": "artifacts/v2/maintenance/archive-maintenance-report.json",
+        "proposal_path": "artifacts/v2/maintenance/archive-maintenance-proposal.json",
+        "gate_path": "artifacts/v2/maintenance/archive-gate-report.json",
+        "maintenance_report": archive_maintenance,
+        "maintenance_proposal": archive_proposal,
+        "archive_gate": archive_gate,
+    }
     return {
         "schema_version": "2.0",
         "app": {"name": "Governance Hub", "version": "v2.0", "default_route": "#/graph"},
         "context_router": context_router,
+        "archive_lifecycle": archive_lifecycle,
         "graph": governance_graph,
         "graph_summary": graph_summary,
         "graphs": graphs,
@@ -415,7 +461,17 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         "projects": {"active_profile": DEFAULT_PROFILE_ID, "default_project": DEFAULT_PROJECT_ID, "manifests": [project_manifest] if project_manifest else [], "summaries": [project_summary] if project_summary else []},
         "lineage_index": lineage_index,
         "view_in_logs_requires_mapping": True,
-        "pipeline_status": {"llm_hub_api_enabled": False, "agent_triggered_archive": True, "view_in_logs_requires_mapping": True, **safety, **(pipeline or {"status": "PASS"})},
+        "pipeline_status": {
+            "llm_hub_api_enabled": False,
+            "agent_triggered_archive": True,
+            "view_in_logs_requires_mapping": True,
+            "archive_gate_available": True,
+            "archive_maintenance_available": True,
+            "live_session_boundary_supported": True,
+            **safety,
+            **archive_lifecycle,
+            **(pipeline or {"status": "PASS"}),
+        },
         "artifact_inventory": [item["path"] for item in inventory if item["path"].startswith("artifacts/")],
         "file_inventory": inventory,
         "inventory_warnings": inventory_warnings,
@@ -446,6 +502,18 @@ def _html(data: dict[str, Any]) -> str:
     router_buttons = "".join(
         f'<button class="router-sample" data-router-sample="{sample.get("id")}">{sample.get("label", sample.get("id"))}</button>'
         for sample in data.get("context_router", {}).get("sample_queries", [])
+    )
+    archive = data.get("archive_lifecycle", {})
+    archive_summary = "".join(
+        [
+            '<span class="archive-chip">live session: active</span>',
+            f'<span class="archive-chip">pending updates: {archive.get("pending_updates_count", 0)}</span>',
+            f'<span class="archive-chip">compiled candidates: {archive.get("compiled_candidates_count", 0)}</span>',
+            f'<span class="archive-chip">context gaps: {archive.get("context_gaps_count", 0)}</span>',
+            f'<span class="archive-chip">stale summaries: {archive.get("stale_summaries_count", 0)}</span>',
+            f'<span class="archive-chip">archive quality: {archive.get("archive_quality", "unknown")}</span>',
+            '<span class="archive-chip">raw sessions: forensic only</span>',
+        ]
     )
     return f"""<!doctype html>
 <html lang="en">
@@ -478,6 +546,7 @@ body.dark .btn, body.dark .status-card, body.dark .graph-workspace, body.dark .l
 .health-row {{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }} .status-card {{ min-width:108px; border:1px solid var(--line); background:#fff; border-radius:13px; padding:8px 10px; box-shadow:0 4px 14px rgba(16,24,40,.04); }} .status-card small {{ color:var(--muted); display:block; }} .status-card strong {{ display:block; font-size:17px; margin-top:2px; }} .ok {{ color:var(--ok); }} .warn {{ color:var(--warn); }}
 .logic-flow {{ display:flex; align-items:center; gap:8px; margin:-2px 0 8px; padding:7px 10px; border:1px solid var(--line); border-radius:14px; background:#fbfcff; color:#475467; font-size:12px; overflow:hidden; white-space:nowrap; }} .logic-flow strong {{ color:var(--ink); }} .logic-flow .arrow {{ color:var(--muted); }}
 .router-strip {{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 10px; padding:8px 10px; border:1px solid #c7d2fe; border-radius:14px; background:#f8f7ff; color:#344054; font-size:12px; }} .router-strip strong {{ color:var(--accent); }} .router-samples {{ display:flex; gap:6px; flex-wrap:wrap; }} .router-sample {{ border:1px solid #c7d2fe; background:#fff; color:#344054; border-radius:999px; padding:4px 8px; cursor:pointer; font-size:11px; }} .router-sample:hover,.router-sample:focus {{ border-color:var(--accent); color:var(--accent); }}
+.archive-strip {{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; padding:8px 10px; border:1px solid #d1fae5; border-radius:14px; background:#f0fdf4; color:#166534; font-size:12px; }} .archive-strip strong {{ color:#166534; }} .archive-chip {{ border:1px solid #bbf7d0; background:#fff; border-radius:999px; padding:4px 8px; }}
 .graph-workspace {{ height:calc(100% - 154px); min-height:0; display:grid; grid-template-columns:minmax(0,1fr) 300px; border:1px solid var(--line); border-radius:18px; overflow:hidden; background:#fff; box-shadow:0 16px 40px rgba(16,24,40,.06); }}
 .graph-main {{ display:grid; grid-template-rows:auto auto auto minmax(300px,1fr) auto; min-width:0; min-height:0; }} .toolbar {{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:8px 12px; border-bottom:1px solid var(--line); max-height:128px; overflow:auto; }} .toolbar-left,.legend,.mode-switch {{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; }} .mode-switch {{ padding:6px 12px; border-bottom:1px solid var(--line); background:#fff; }} .mode-btn[aria-pressed="true"] {{ background:var(--accent); color:#fff; border-color:var(--accent); }}
 .search {{ border:1px solid var(--line); border-radius:10px; padding:8px 11px; min-width:220px; }} .legend-item {{ color:#475467; font-size:12px; }} .dot {{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; }}
@@ -507,6 +576,7 @@ pre {{ margin:0; white-space:pre-wrap; overflow:auto; max-height:52vh; backgroun
 <section class="route active content" data-route="graph" id="graph-route"><div class="page-head"><div><h1 id="graph-title">Governance Graph</h1><div class="subtitle" id="graph-subtitle">Interactive view of tools, knowledge, policies, artifacts, proposals, sessions, and provenance.</div></div><div class="health-row"><div class="status-card"><small>System Health</small><strong class="ok">{status}</strong></div><div class="status-card"><small>Nodes</small><strong id="graph-node-total">{len(nodes)}</strong></div><div class="status-card"><small>Edges</small><strong id="graph-edge-total">{len(edges)}</strong></div><div class="status-card"><small>Safety</small><strong class="warn">READ ONLY</strong></div></div></div>
 <div class="logic-flow" aria-label="Logic Flow"><strong>Logic Flow</strong><span>Profile</span><span class="arrow">→</span><span>Project</span><span class="arrow">→</span><span>Session Knowledge</span><span class="arrow">→</span><span>Governance Graph</span><span class="arrow">→</span><span>Agent Memory Graph</span><span class="arrow">→</span><span>Dashboard</span><span class="arrow">→</span><span>Logs</span></div>
 <div class="router-strip" id="context-router-strip" aria-label="Context Router"><span><strong>Context Router</strong> · Budgeted traversal · <code>context-index.json</code> · Raw sessions: forensic only · Samples export: <code>router-samples.json</code> · Packets: <code>context-packets.json</code></span><span class="router-samples">{router_buttons}</span></div>
+<div class="archive-strip" id="archive-lifecycle-summary" aria-label="Archive Lifecycle"><span><strong>Archive Lifecycle</strong></span>{archive_summary}</div>
 <div class="graph-workspace"><div class="graph-main"><div class="toolbar"><div class="toolbar-left"><label class="project-selector" id="project-selector">Project: <select id="project-select" aria-label="Project selector">{project_options}</select></label><input id="graph-search" class="search" placeholder="Search visible graph"><button class="btn" id="fit-view">Fit view</button><button class="btn" id="focus-hubs">Focus hubs</button><details class="filter-panel" id="filter-panel"><summary>Filters</summary><div class="type-filter-panel" id="type-filter-panel"><span class="subtitle">Node filters</span><span id="type-filter-chips"></span></div><div class="type-filter-panel"><span class="subtitle">Edge filters</span><span id="edge-filter-chips"></span><button class="btn" id="clear-edge-filters">All edges</button><button class="btn" id="clear-graph-filters">Clear filters</button></div></details></div><div class="legend" id="graph-legend"></div><span class="count-pill" id="visible-node-count">0 visible nodes</span></div><div class="mode-switch" aria-label="Graph dataset mode"><strong>Graph mode</strong><button class="btn mode-btn" data-graph-dataset="governance" aria-pressed="true">Governance (default)</button><button class="btn mode-btn" data-graph-dataset="memory" aria-pressed="false">Memory</button><span class="subtitle" id="graph-dataset-help">Governance = repo-wide asset graph. Memory = agent context/protocol graph.</span></div><div class="mode-switch" aria-label="Graph view mode"><button class="btn mode-btn" data-graph-mode="overview" aria-pressed="true" title="Curated 10-25 high-value nodes">Overview · curated</button><button class="btn mode-btn" data-graph-mode="focus" aria-pressed="false" title="Selected node plus immediate neighbors">Focus · 1-hop</button><button class="btn mode-btn" data-graph-mode="full" aria-pressed="false" title="All nodes and edges for debugging">Full graph</button><span class="subtitle" id="mode-help">Overview = curated system map. Focus = selected item plus 1-hop neighbors. Full graph = debug/all nodes.</span></div><div class="graph-canvas-wrap" id="graph-wrap"><svg id="graph-canvas" role="img" aria-label="Governance Graph"><defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#a8b2c7"></path></marker></defs><g id="viewport"><g id="edge-layer"></g><g id="node-layer"></g></g></svg><div class="float-controls"><button id="zoom-in">+</button><button id="zoom-out">−</button><button id="zoom-reset">⌂</button><button title="Read-only lock">🔒</button></div><div class="minimap" id="minimap"></div></div><div class="graph-hint">ⓘ Drag nodes to reposition · Click nodes or edges to inspect · Edge filters reduce dense views · Scroll to zoom · Double-click empty space to reset view</div></div><aside class="inspector"><div class="tabs" role="tablist" aria-label="Inspector views"><button class="tab active" role="tab" data-inspector-tab="inspect" aria-selected="true">Inspect</button><button class="tab" role="tab" data-inspector-tab="edge" aria-selected="false" id="edge-inspector">Edge</button><button class="tab" role="tab" data-inspector-tab="summary" aria-selected="false">Summary</button></div><h2 id="node-inspector">Graph diagnostic summary</h2><div class="kv" id="inspector-body"></div><a class="btn logs-link" href="#/logs" id="view-in-logs">View in Logs →</a><div class="mapping-note" id="log-mapping-note">Log mapping uses exact indexed local artifact paths only.</div></aside></div>
 </section>
 <section class="route content" data-route="logs" id="logs-route"><div class="page-head"><div><h1>Logs</h1><div class="subtitle">Browse and inspect raw local artifacts, metadata, and lineage. No actions execute from this page.</div></div><div class="top-actions"><a class="btn primary" href="#/graph">Graph</a><span class="badge">READ ONLY</span></div></div><div class="logs-scroll-hint"><span>Use the File Explorer, Table, and Preview scrollbars for lower content</span><span>No browser page scroll</span></div><div class="logs-layout"><aside class="explorer"><div class="pane-head"><strong>File Explorer</strong><span class="badge" id="explorer-count">0 items</span></div><ul class="tree" id="file-tree"></ul></aside><section class="file-table"><div class="pane-head"><div><strong id="folder-title">artifacts/</strong> <span class="badge" id="table-count">0 items</span></div><div><input id="file-search" class="search" placeholder="Search files and folders"><div class="scroll-actions"><button class="scroll-btn" id="table-scroll-up">↑ table</button><button class="scroll-btn" id="table-scroll-down">↓ table</button></div></div></div><div class="file-table-scroll" id="file-table-scroll"><table><thead><tr><th>Name / Path</th><th>Type</th><th>Size</th><th>Modified</th><th>Level/Status</th></tr></thead><tbody id="file-rows"></tbody></table></div></section><aside class="preview-panel" id="preview-panel"><div class="file-title"><div><h2 id="preview-title">Select a file</h2><div class="subtitle" id="preview-subtitle">Preview, Raw, Metadata, and Lineage</div></div><button class="btn" id="copy-path">Copy path</button></div><div class="preview-tabs"><button class="active" data-preview-tab="preview">Preview</button><button data-preview-tab="raw">Raw</button><button data-preview-tab="metadata">Metadata</button><button data-preview-tab="lineage">Lineage</button></div><div class="preview-toolbar"><button class="scroll-btn" id="preview-scroll-up">↑ preview</button><button class="scroll-btn" id="preview-scroll-down">↓ preview</button></div><pre id="preview-code">No file selected.</pre><section><h3>Lineage</h3><div class="lineage-flow" id="lineage-flow"></div></section></aside></div></section>

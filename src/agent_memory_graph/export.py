@@ -8,7 +8,7 @@ from .lineage import write_global_lineage
 from .profiles import build_profile_index, ensure_profile
 from .projects import ensure_project, load_project_bundle
 from .repo_adapter import read_repo_manifest
-from .schemas import default_global_graph, deterministic_write_json, relpath
+from .schemas import default_global_graph, deterministic_write_json, read_json, relpath
 
 
 def _node(node_id: str, node_type: str, label: str, **extra: Any) -> dict[str, Any]:
@@ -96,15 +96,20 @@ def build_global_graph(memory_root: Path, profile_id: str, project_id: str) -> d
             edges.append(_edge(f'edge:{source}:{link_type}:{target}', source, target, link_type, confidence=0.8))
     graph['nodes'] = sorted(nodes, key=lambda item: item['id'])
     graph['edges'] = sorted(edges, key=lambda item: item['id'])
+    maintenance = read_json(memory_root / 'reports' / 'archive-maintenance-report.json')
     graph['summary'] = {
         'profile_support': True,
         'project_support': True,
         'global_agent_memory_graph_supported': True,
         'graph_governed_context_protocol': True,
         'raw_sessions_default_read': False,
+        'live_session_boundary_supported': True,
+        'archive_gate_available': (memory_root / 'reports' / 'archive-gate-report.json').exists(),
+        'archive_maintenance_available': bool(maintenance),
         'repo_context_manifest_available': True,
         'agent_graph_cli_available': True,
         'project_role': manifest.get('role'),
+        'archive_quality_status': maintenance.get('archive_quality_status', 'unknown'),
     }
     return graph
 
@@ -166,6 +171,16 @@ def export_repo_projection(repo_root: Path | str, memory_root: Path | str) -> di
     deterministic_write_json(lineage_path, repo_lineage)
     profile_index_path = repo_root / 'artifacts' / 'v2' / 'profiles' / 'profile-index.json'
     deterministic_write_json(profile_index_path, profile_index)
+    maintenance_root = repo_root / 'artifacts' / 'v2' / 'maintenance'
+    maintenance_root.mkdir(parents=True, exist_ok=True)
+    for name in (
+        'archive-gate-report.json',
+        'archive-maintenance-report.json',
+        'archive-maintenance-proposal.json',
+    ):
+        source = memory_root / 'reports' / name
+        if source.exists():
+            shutil.copyfile(source, maintenance_root / name)
     return {
         'status': 'PASS',
         'repo_path': repo_root.as_posix(),

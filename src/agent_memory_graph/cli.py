@@ -5,10 +5,12 @@ import json
 from pathlib import Path
 
 from .archive import archive_session
+from .archive_gate import classify_archive_input, write_archive_gate_report
 from .bootstrap import bootstrap_repo, validate_repo
 from .context_gaps import list_context_gaps
 from .context_index import build_context_index
 from .export import export_repo_projection
+from .maintenance import generate_archive_maintenance_proposal, validate_archive_maintenance, write_archive_maintenance_report
 from .pending_updates import capture_pending_update
 from .repo_adapter import init_repo_manifest
 from .router import route_query
@@ -71,6 +73,28 @@ def build_parser() -> argparse.ArgumentParser:
     gaps = sub.add_parser("list-gaps", help="List graph traversal context gaps")
     gaps.add_argument("--repo", default=".")
     gaps.add_argument("--memory-root", default=None)
+
+    archive_gate = sub.add_parser("archive-gate", help="Archive lifecycle boundary classification and reporting")
+    archive_gate_sub = archive_gate.add_subparsers(dest="archive_gate_command", required=True)
+    archive_gate_classify = archive_gate_sub.add_parser("classify", help="Classify an input as transient, pending update, compiled candidate, or forensic only")
+    archive_gate_classify.add_argument("--input", required=True)
+    archive_gate_classify.add_argument("--repo", default=".")
+    archive_gate_classify.add_argument("--memory-root", default=None)
+    archive_gate_report = archive_gate_sub.add_parser("report", help="Write archive gate lifecycle report")
+    archive_gate_report.add_argument("--repo", default=".")
+    archive_gate_report.add_argument("--memory-root", default=None)
+
+    maintenance = sub.add_parser("maintenance", help="Archive lifecycle maintenance reporting and proposal commands")
+    maintenance_sub = maintenance.add_subparsers(dest="maintenance_command", required=True)
+    maintenance_report = maintenance_sub.add_parser("report", help="Write archive maintenance report")
+    maintenance_report.add_argument("--repo", default=".")
+    maintenance_report.add_argument("--memory-root", default=None)
+    maintenance_validate = maintenance_sub.add_parser("validate", help="Validate archive lifecycle maintenance posture")
+    maintenance_validate.add_argument("--repo", default=".")
+    maintenance_validate.add_argument("--memory-root", default=None)
+    maintenance_propose = maintenance_sub.add_parser("propose", help="Write proposal-only archive maintenance actions")
+    maintenance_propose.add_argument("--repo", default=".")
+    maintenance_propose.add_argument("--memory-root", default=None)
     return parser
 
 
@@ -121,6 +145,28 @@ def main(argv: list[str] | None = None) -> int:
         report = list_context_gaps(Path(args.repo), args.memory_root)
         _print(report)
         return 0 if report["status"] == "PASS" else 1
+    if args.command == "archive-gate":
+        if args.archive_gate_command == "classify":
+            report = classify_archive_input(args.input, args.repo, args.memory_root)
+            _print(report)
+            return 0 if report["status"] == "PASS" else 1
+        if args.archive_gate_command == "report":
+            report = write_archive_gate_report(Path(args.repo), args.memory_root)
+            _print(report)
+            return 0 if report["status"] == "PASS" else 1
+    if args.command == "maintenance":
+        if args.maintenance_command == "report":
+            report = write_archive_maintenance_report(Path(args.repo), args.memory_root)
+            _print(report)
+            return 0 if report["status"] in {"PASS", "PASS_WITH_WARNINGS"} else 1
+        if args.maintenance_command == "validate":
+            report = validate_archive_maintenance(Path(args.repo), args.memory_root)
+            _print(report)
+            return 0 if report["status"] in {"PASS", "PASS_WITH_WARNINGS"} else 1
+        if args.maintenance_command == "propose":
+            report = generate_archive_maintenance_proposal(Path(args.repo), args.memory_root)
+            _print(report)
+            return 0 if report["status"] == "PASS" else 1
     return 1
 
 
