@@ -42,6 +42,30 @@ That manifest binds the repo to:
 - a global memory source
 - deterministic repo-local export targets
 
+## Budgeted traversal router
+
+Agent work should now pass through the budgeted graph traversal router:
+
+```text
+repo manifest -> profile -> project -> context index -> Agent Memory Graph entry node -> bounded traversal -> context packet
+```
+
+The router is structured context routing, not RAG. It does not use embeddings, vector search, reranking, or broad fallback search.
+
+Budgets:
+
+- `fast`: context index, project summary, direct entry artifacts
+- `normal`: fast plus selected decisions / requirements / constraints and lineage paths
+- `deep`: normal plus mapped logs and session summaries
+- `forensic`: deep plus explicit raw-session permission
+
+Routing semantics:
+
+- new information becomes a pending update
+- retrieval miss becomes a context gap
+- ambiguous intent sets `requires_llm_gate=true` and does not deepen context automatically
+- raw sessions are explicit forensic-only
+
 ## Phase boundary
 
 This phase is local-only:
@@ -51,6 +75,7 @@ This phase is local-only:
 - no external CDN
 - no graph mutation execution
 - no destructive apply flow
+- no embeddings, vector DB, or reranker
 
 ## Dual graph architecture
 

@@ -56,17 +56,19 @@ python -m graph_harness_maintain pipeline v1.1-rc --strict
 
 v2.0 promotes `graph-harness-maintain` from a repo-local dashboard into the reference implementation and dashboard/export target for a reusable global Agent Memory Graph protocol. The default context order is graph-first: global graph, active profile, active project, project summary, decision ledger, requirements, constraints, lineage index, mapped logs/artifacts, and raw sessions last.
 
-Use the portable `agent-graph` CLI to initialize repo manifests, bootstrap temporary memory roots, validate graph-governed context, archive agent-compiled session JSON, and export repo-local dashboard artifacts:
+Use the portable `agent-graph` CLI to initialize repo manifests, bootstrap temporary memory roots, validate graph-governed context, build the budgeted traversal index, route task context, archive agent-compiled session JSON, and export repo-local dashboard artifacts:
 
 ```bash
 agent-graph init-repo --repo . --profile general --project harness-self-governance
 TMP_MEM=$(mktemp -d)
-agent-graph bootstrap --repo . --memory-root "$TMP_MEM"
+agent-graph bootstrap --repo . --memory-root "$TMP_MEM" --context-budget fast
+agent-graph build-index --repo . --memory-root "$TMP_MEM"
+agent-graph route --repo . --query "view in logs lineage mapping" --memory-root "$TMP_MEM" --context-budget fast
 agent-graph validate --repo . --memory-root "$TMP_MEM"
 agent-graph export --repo . --memory-root "$TMP_MEM"
 ```
 
-The repo manifest lives at `.agent/context.json`. Repo-local exports remain deterministic under `artifacts/v2/`. The dashboard is still static and read-only: no backend, no npm, no external CDN, no Hub-side LLM API, no destructive apply, no graph mutation execution, and no sensitive export.
+The repo manifest lives at `.agent/context.json`. Repo-local exports remain deterministic under `artifacts/v2/`. The budgeted context router is structured graph traversal, not RAG: no embeddings, vector DB, reranker, broad fallback search, or default raw-session replay. The dashboard is still static and read-only: no backend, no npm, no external CDN, no Hub-side LLM API, no destructive apply, no graph mutation execution, and no sensitive export.
 
 Legacy v2 helper commands remain available:
 

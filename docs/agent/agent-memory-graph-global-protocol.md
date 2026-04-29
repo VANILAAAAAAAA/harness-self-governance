@@ -41,9 +41,40 @@ agent-graph ... --memory-root <path>
   graph/
     global-graph.json
     global-lineage-index.json
+  index/
+    context-index.json
+  routing/
+    pending-updates.json
+    context-gaps/
   reports/
     context-bootstrap-report.json
 ```
+
+## Budgeted graph traversal router
+
+Run:
+
+```bash
+agent-graph build-index --repo . --memory-root <path>
+agent-graph route --repo . --query "view in logs lineage mapping" --memory-root <path> --context-budget fast
+agent-graph traverse --repo . --node project:general:harness-self-governance --max-depth 2 --memory-root <path>
+```
+
+The router uses structured graph traversal over the Agent Memory Graph. It is not RAG: no embeddings, no vector database, no reranking, and no broad fallback search.
+
+New information is captured as a pending update:
+
+```bash
+agent-graph capture-update --repo . --text "..." --profile general --project harness-self-governance --memory-root <path>
+```
+
+Retrieval misses are recorded as context gaps and can be inspected with:
+
+```bash
+agent-graph list-gaps --repo . --memory-root <path>
+```
+
+Raw sessions are explicit forensic-only. The default `fast` budget never reads raw sessions.
 
 ## Archive flow
 

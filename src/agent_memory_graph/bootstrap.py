@@ -28,7 +28,7 @@ def _write_config(memory_root: Path) -> Path:
     return target
 
 
-def bootstrap_repo(repo_root: Path | str, memory_root: Path | str | None = None) -> dict[str, Any]:
+def bootstrap_repo(repo_root: Path | str, memory_root: Path | str | None = None, context_budget: str = "fast") -> dict[str, Any]:
     repo_root = Path(repo_root).resolve()
     memory_root = resolve_memory_root(memory_root)
     blockers: list[str] = []
@@ -66,7 +66,12 @@ def bootstrap_repo(repo_root: Path | str, memory_root: Path | str | None = None)
         "constraints_path": (project_root / "constraints.json").as_posix(),
         "lineage_index_path": lineage_path.as_posix(),
         "recommended_read_order": RECOMMENDED_READ_ORDER,
-        "raw_sessions_policy": "last_resort",
+        "default_budget": context_budget,
+        "graph_traversal_router_available": True,
+        "context_index_available": True,
+        "novelty_aware_routing": True,
+        "raw_sessions_policy": "explicit_forensic_only",
+        "raw_sessions_default_read": False,
         "warnings": [],
         "blockers": blockers,
     }

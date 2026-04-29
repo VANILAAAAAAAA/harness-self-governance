@@ -105,6 +105,11 @@ def test_agent_memory_graph_module_help_commands_work() -> None:
         ("validate", "--help"),
         ("archive-session", "--help"),
         ("export", "--help"),
+        ("build-index", "--help"),
+        ("route", "--help"),
+        ("traverse", "--help"),
+        ("capture-update", "--help"),
+        ("list-gaps", "--help"),
     ]
     for args in commands:
         result = subprocess.run([PY, "-m", "agent_memory_graph", *args], cwd=ROOT, text=True, capture_output=True, env=_env())

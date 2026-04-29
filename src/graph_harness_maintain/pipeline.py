@@ -9,6 +9,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from agent_memory_graph.bootstrap import bootstrap_repo as bootstrap_agent_graph_repo, validate_repo as validate_agent_graph_repo
+from agent_memory_graph.context_index import build_context_index
 from agent_memory_graph.export import export_repo_projection
 from agent_memory_graph.repo_adapter import init_repo_manifest
 
@@ -454,8 +455,9 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
     sessions = compress_sessions(repo_root, raw_dir, artifacts_root / "sessions")
     repo_manifest = init_repo_manifest(repo_root, DEFAULT_PROFILE_ID, DEFAULT_PROJECT_ID, force=False)
     with TemporaryDirectory(prefix="agent-memory-graph-") as temp_memory_root:
-        bootstrap = bootstrap_agent_graph_repo(repo_root, temp_memory_root)
+        bootstrap = bootstrap_agent_graph_repo(repo_root, temp_memory_root, context_budget="fast")
         agent_graph_validation = validate_agent_graph_repo(repo_root, temp_memory_root)
+        context_index = build_context_index(repo_root, temp_memory_root)
         memory_graph_export = export_repo_projection(repo_root, temp_memory_root)
     governance_graph = write_governance_graph(repo_root, artifacts_root / "graph" / "governance-graph.json")
     dashboard = build_dashboard(repo_root, artifacts_root / "dashboard" / "index.html")
@@ -468,6 +470,7 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
         "repo_manifest": repo_manifest,
         "bootstrap": bootstrap,
         "agent_graph_validation": agent_graph_validation,
+        "context_index": context_index,
         "memory_graph_export": memory_graph_export,
         "governance_graph": governance_graph,
         "dashboard": dashboard,
@@ -512,6 +515,10 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
         "graph_governed_context_protocol": True,
         "raw_sessions_default_read": False,
         "agent_graph_cli_available": True,
+        "budgeted_context_router_supported": True,
+        "context_index_available": context_index.get("status") == "PASS",
+        "graph_traversal_context_protocol": True,
+        "novelty_aware_context_policy": True,
         "blockers": blockers,
         "warnings": warnings,
         "stages": stages,
