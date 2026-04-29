@@ -13,6 +13,7 @@ from .pending_updates import capture_pending_update
 from .repo_adapter import init_repo_manifest
 from .router import route_query
 from .traversal import traverse_memory_graph
+from .schemas import resolve_memory_root
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -93,11 +94,11 @@ def main(argv: list[str] | None = None) -> int:
         _print(report)
         return 0 if report["status"] == "PASS" else 1
     if args.command == "archive-session":
-        report = archive_session(args.memory_root or "~/.agent-memory-graph", args.profile, args.project, args.input)
+        report = archive_session(resolve_memory_root(args.memory_root), args.profile, args.project, args.input)
         _print(report)
         return 0 if report["status"] == "PASS" else 1
     if args.command == "export":
-        report = export_repo_projection(Path(args.repo), args.memory_root or "~/.agent-memory-graph")
+        report = export_repo_projection(Path(args.repo), resolve_memory_root(args.memory_root))
         _print(report)
         return 0 if report["status"] == "PASS" else 1
     if args.command == "build-index":

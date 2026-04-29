@@ -1,0 +1,79 @@
+{
+  "constraints": [
+    {
+      "id": "constraint:no-fuzzy-lineage-navigation",
+      "source": "session:v2-profile-project-lineage-model",
+      "text": "The dashboard cannot route View in Logs through fuzzy lineage guesses; missing mappings must remain disabled."
+    },
+    {
+      "id": "constraint:no-cross-profile-raw-leakage",
+      "source": "session:v2-profile-project-lineage-model",
+      "text": "Profile and project lineage cannot leak raw domain content across profile boundaries."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "decision:general-governance-hub",
+      "source": "session:v2-profile-project-lineage-model",
+      "status": "accepted",
+      "text": "The general profile is the governance hub for reusable protocol, dashboard exports, and cross-project structure."
+    },
+    {
+      "id": "decision:ehrlab-domain-profile",
+      "source": "session:v2-profile-project-lineage-model",
+      "status": "accepted",
+      "text": "The ehrlab profile is a domain knowledge profile rather than the global governance hub."
+    },
+    {
+      "id": "decision:view-in-logs-needs-exact-lineage",
+      "source": "session:v2-profile-project-lineage-model",
+      "status": "accepted",
+      "text": "View in Logs requires exact lineage mapping from a node or edge to a concrete exported artifact path."
+    }
+  ],
+  "graph_links": [
+    {
+      "source": "decision:general-governance-hub",
+      "target": "requirement:active-project-harness-self-governance",
+      "type": "owns_project"
+    },
+    {
+      "source": "decision:view-in-logs-needs-exact-lineage",
+      "target": "requirement:unmapped-nodes-hide-view-in-logs",
+      "type": "supports"
+    },
+    {
+      "source": "decision:view-in-logs-needs-exact-lineage",
+      "target": "constraint:no-fuzzy-lineage-navigation",
+      "type": "constrains"
+    },
+    {
+      "source": "decision:ehrlab-domain-profile",
+      "target": "constraint:no-cross-profile-raw-leakage",
+      "type": "constrains"
+    },
+    {
+      "source": "decision:view-in-logs-needs-exact-lineage",
+      "target": "artifact:artifacts/v2/lineage/log-index.json",
+      "type": "projects_to"
+    }
+  ],
+  "privacy": "local_only",
+  "profile_id": "general",
+  "project_id": "harness-self-governance",
+  "requirements": [
+    {
+      "id": "requirement:active-project-harness-self-governance",
+      "source": "session:v2-profile-project-lineage-model",
+      "text": "The repo manifest and memory graph must identify harness-self-governance as the active project for the general profile."
+    },
+    {
+      "id": "requirement:unmapped-nodes-hide-view-in-logs",
+      "source": "session:v2-profile-project-lineage-model",
+      "text": "Unmapped nodes and edges must hide or disable View in Logs instead of guessing a fuzzy destination."
+    }
+  ],
+  "schema_version": "2.0",
+  "session_id": "session:v2-profile-project-lineage-model",
+  "summary": "The profile, project, and lineage model defines general as the governance hub, ehrlab as the domain profile, harness-self-governance as the active project, and exact lineage mapping as the contract behind View in Logs behavior."
+}

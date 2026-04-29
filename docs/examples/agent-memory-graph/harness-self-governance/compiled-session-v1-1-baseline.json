@@ -1,0 +1,73 @@
+{
+  "constraints": [
+    {
+      "id": "constraint:v1-1-no-graph-mutation-execution",
+      "source": "session:v1-1-reviewed-proposal-baseline",
+      "text": "Graph mutation remains blocked; reviewed proposal outputs cannot execute graph or event mutations."
+    },
+    {
+      "id": "constraint:v1-1-no-destructive-review-apply",
+      "source": "session:v1-1-reviewed-proposal-baseline",
+      "text": "Reviewed proposal output cannot perform destructive apply or release side effects without a separate approval path."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "decision:v1-1-reviewed-proposals",
+      "source": "session:v1-1-reviewed-proposal-baseline",
+      "status": "accepted",
+      "text": "v1.1 introduces a reviewed proposal layer with deterministic schemas instead of direct apply behavior."
+    },
+    {
+      "id": "decision:v1-1-reviewed-apply-gated",
+      "source": "session:v1-1-reviewed-proposal-baseline",
+      "status": "accepted",
+      "text": "Reviewed apply remains gated and non-executing even when proposal validation succeeds."
+    }
+  ],
+  "graph_links": [
+    {
+      "source": "decision:v1-1-reviewed-proposals",
+      "target": "requirement:v1-1-proposal-schema",
+      "type": "supports"
+    },
+    {
+      "source": "decision:v1-1-reviewed-apply-gated",
+      "target": "constraint:v1-1-no-destructive-review-apply",
+      "type": "constrains"
+    },
+    {
+      "source": "decision:v1-1-reviewed-proposals",
+      "target": "constraint:v1-1-no-graph-mutation-execution",
+      "type": "constrains"
+    },
+    {
+      "source": "requirement:v1-1-release-hardening",
+      "target": "artifact:docs/plans/v1.1-reviewed-action-layer.md",
+      "type": "documented_by"
+    },
+    {
+      "source": "decision:v1-1-reviewed-apply-gated",
+      "target": "tool:agent-graph-cli",
+      "type": "precedes"
+    }
+  ],
+  "privacy": "local_only",
+  "profile_id": "general",
+  "project_id": "harness-self-governance",
+  "requirements": [
+    {
+      "id": "requirement:v1-1-proposal-schema",
+      "source": "session:v1-1-reviewed-proposal-baseline",
+      "text": "The reviewed proposal baseline must validate a proposal schema, template set, and adapter report before release readiness."
+    },
+    {
+      "id": "requirement:v1-1-release-hardening",
+      "source": "session:v1-1-reviewed-proposal-baseline",
+      "text": "The v1.1.0 release path must include hardening evidence for identity, policy, and reviewed proposal invariants."
+    }
+  ],
+  "schema_version": "2.0",
+  "session_id": "session:v1-1-reviewed-proposal-baseline",
+  "summary": "v1.1 added the reviewed proposal baseline: proposal schema, adapter report, reviewed apply gating, graph mutation blocked, and release hardening through the v1.1.0 tag and release completion criteria."
+}

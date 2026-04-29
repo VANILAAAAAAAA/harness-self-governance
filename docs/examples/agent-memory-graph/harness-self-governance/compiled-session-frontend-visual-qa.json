@@ -1,0 +1,73 @@
+{
+  "constraints": [
+    {
+      "id": "constraint:frontend-no-screenshot-commit",
+      "source": "session:v2-frontend-visual-qa-workflow",
+      "text": "Screenshots are temporary QA artifacts and must never be committed."
+    },
+    {
+      "id": "constraint:frontend-no-raw-session-commit",
+      "source": "session:v2-frontend-visual-qa-workflow",
+      "text": "Raw sessions remain local-only and are never committed as frontend QA evidence."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "decision:frontend-visual-qa-global-skill",
+      "source": "session:v2-frontend-visual-qa-workflow",
+      "status": "accepted",
+      "text": "Frontend dashboard work uses a shared frontend visual QA skill and screenshot-based review rather than code-only inspection."
+    },
+    {
+      "id": "decision:frontend-clickable-contract",
+      "source": "session:v2-frontend-visual-qa-workflow",
+      "status": "accepted",
+      "text": "Clickable-looking UI elements must have an explicit interaction contract for graph navigation, logs navigation, nodes, edges, and inspector actions."
+    }
+  ],
+  "graph_links": [
+    {
+      "source": "decision:frontend-visual-qa-global-skill",
+      "target": "requirement:frontend-playwright-capture",
+      "type": "supports"
+    },
+    {
+      "source": "requirement:frontend-delete-screenshots",
+      "target": "constraint:frontend-no-screenshot-commit",
+      "type": "constrains"
+    },
+    {
+      "source": "decision:frontend-clickable-contract",
+      "target": "tool:frontend-visual-qa",
+      "type": "uses_tool"
+    },
+    {
+      "source": "decision:frontend-clickable-contract",
+      "target": "artifact:docs/examples/agent-memory-graph/harness-self-governance/archive-readme.md",
+      "type": "documented_by"
+    },
+    {
+      "source": "decision:frontend-visual-qa-global-skill",
+      "target": "constraint:frontend-no-raw-session-commit",
+      "type": "constrains"
+    }
+  ],
+  "privacy": "local_only",
+  "profile_id": "general",
+  "project_id": "harness-self-governance",
+  "requirements": [
+    {
+      "id": "requirement:frontend-playwright-capture",
+      "source": "session:v2-frontend-visual-qa-workflow",
+      "text": "Dashboard changes that affect rendering should be verified with Playwright screenshots for graph and logs pages."
+    },
+    {
+      "id": "requirement:frontend-delete-screenshots",
+      "source": "session:v2-frontend-visual-qa-workflow",
+      "text": "Temporary screenshots must be inspected locally and deleted before commit."
+    }
+  ],
+  "schema_version": "2.0",
+  "session_id": "session:v2-frontend-visual-qa-workflow",
+  "summary": "The frontend visual QA workflow became a global contract for the dashboard: use the frontend-visual-qa skill, capture Playwright screenshots, inspect them locally, delete them afterward, and enforce a clickable interaction contract for graph and logs UI."
+}

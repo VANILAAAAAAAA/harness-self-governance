@@ -1,0 +1,84 @@
+{
+  "constraints": [
+    {
+      "id": "constraint:no-raw-session-commit",
+      "source": "session:v2-global-agent-memory-graph-protocol",
+      "text": "Raw sessions cannot be committed as source artifacts for the Agent Memory Graph."
+    },
+    {
+      "id": "constraint:no-sensitive-export",
+      "source": "session:v2-global-agent-memory-graph-protocol",
+      "text": "The protocol cannot export secrets or sensitive local data into repo-local dashboard artifacts."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "decision:agent-memory-graph-global-root",
+      "source": "session:v2-global-agent-memory-graph-protocol",
+      "status": "accepted",
+      "text": "The Agent Memory Graph uses a global memory root outside the repo while exporting read-only projections back into repo-local artifacts."
+    },
+    {
+      "id": "decision:agent-graph-cli-surface",
+      "source": "session:v2-global-agent-memory-graph-protocol",
+      "status": "accepted",
+      "text": "The agent-graph CLI provides bootstrap, init-repo, validate, archive-session, and export as the portable protocol surface."
+    },
+    {
+      "id": "decision:raw-sessions-last-resort",
+      "source": "session:v2-global-agent-memory-graph-protocol",
+      "status": "accepted",
+      "text": "Raw sessions are source material and explicit last-resort context rather than the default input layer."
+    }
+  ],
+  "graph_links": [
+    {
+      "source": "decision:agent-memory-graph-global-root",
+      "target": "requirement:repo-manifest-context-json",
+      "type": "supports"
+    },
+    {
+      "source": "decision:agent-graph-cli-surface",
+      "target": "tool:agent-graph-cli",
+      "type": "implements"
+    },
+    {
+      "source": "decision:raw-sessions-last-resort",
+      "target": "constraint:no-raw-session-commit",
+      "type": "constrains"
+    },
+    {
+      "source": "decision:agent-graph-cli-surface",
+      "target": "requirement:archive-compiled-sessions-only",
+      "type": "supports"
+    },
+    {
+      "source": "requirement:repo-manifest-context-json",
+      "target": "artifact:.agent/context.json",
+      "type": "documented_by"
+    },
+    {
+      "source": "decision:agent-memory-graph-global-root",
+      "target": "constraint:no-sensitive-export",
+      "type": "constrains"
+    }
+  ],
+  "privacy": "local_only",
+  "profile_id": "general",
+  "project_id": "harness-self-governance",
+  "requirements": [
+    {
+      "id": "requirement:repo-manifest-context-json",
+      "source": "session:v2-global-agent-memory-graph-protocol",
+      "text": "Every adopting repository must commit a repo-local .agent/context.json manifest that points exports into deterministic artifacts paths."
+    },
+    {
+      "id": "requirement:archive-compiled-sessions-only",
+      "source": "session:v2-global-agent-memory-graph-protocol",
+      "text": "archive-session ingests curated compiled-session JSON artifacts rather than raw session dumps."
+    }
+  ],
+  "schema_version": "2.0",
+  "session_id": "session:v2-global-agent-memory-graph-protocol",
+  "summary": "The global Agent Memory Graph protocol introduced a shared memory root, a repo-scoped .agent/context.json manifest, agent-graph bootstrap/init-repo/validate/archive-session/export commands, and a rule that raw sessions stay source material and last-resort context."
+}

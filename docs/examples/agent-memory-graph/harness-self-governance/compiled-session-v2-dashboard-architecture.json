@@ -1,0 +1,84 @@
+{
+  "constraints": [
+    {
+      "id": "constraint:v2-no-backend",
+      "source": "session:v2-dual-graph-dashboard-architecture",
+      "text": "v2 remains static and local-only with no backend server requirement."
+    },
+    {
+      "id": "constraint:v2-no-model-provider-ui",
+      "source": "session:v2-dual-graph-dashboard-architecture",
+      "text": "v2 defers model, provider, settings, policies, and health pages to later versions."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "decision:v2-graph-and-logs-only-core-pages",
+      "source": "session:v2-dual-graph-dashboard-architecture",
+      "status": "accepted",
+      "text": "Graph and Logs are the only v2 core dashboard pages in the first production architecture."
+    },
+    {
+      "id": "decision:v2-dual-graph-architecture",
+      "source": "session:v2-dual-graph-dashboard-architecture",
+      "status": "accepted",
+      "text": "The system uses a dual graph architecture: Governance Graph for repo-wide evidence navigation and Agent Memory Graph for agent context and protocol."
+    },
+    {
+      "id": "decision:v2-governance-graph-default",
+      "source": "session:v2-dual-graph-dashboard-architecture",
+      "status": "accepted",
+      "text": "The dashboard defaults to Governance Graph mode while still exposing Memory Graph visibility."
+    }
+  ],
+  "graph_links": [
+    {
+      "source": "decision:v2-graph-and-logs-only-core-pages",
+      "target": "requirement:v2-logs-page-evidence-browser",
+      "type": "supports"
+    },
+    {
+      "source": "decision:v2-dual-graph-architecture",
+      "target": "requirement:v2-memory-graph-visible",
+      "type": "supports"
+    },
+    {
+      "source": "decision:v2-governance-graph-default",
+      "target": "artifact:artifacts/v2/graph/governance-graph.json",
+      "type": "projects_to"
+    },
+    {
+      "source": "decision:v2-dual-graph-architecture",
+      "target": "protocol:graph-governed-context",
+      "type": "implements"
+    },
+    {
+      "source": "decision:v2-graph-and-logs-only-core-pages",
+      "target": "constraint:v2-no-model-provider-ui",
+      "type": "constrains"
+    },
+    {
+      "source": "decision:v2-dual-graph-architecture",
+      "target": "constraint:v2-no-backend",
+      "type": "constrains"
+    }
+  ],
+  "privacy": "local_only",
+  "profile_id": "general",
+  "project_id": "harness-self-governance",
+  "requirements": [
+    {
+      "id": "requirement:v2-logs-page-evidence-browser",
+      "source": "session:v2-dual-graph-dashboard-architecture",
+      "text": "The Logs page must act as the evidence and artifact browser for repo-local exports and lineage-backed navigation."
+    },
+    {
+      "id": "requirement:v2-memory-graph-visible",
+      "source": "session:v2-dual-graph-dashboard-architecture",
+      "text": "The dashboard and router must expose the Agent Memory Graph as a real context layer rather than a hidden implementation detail."
+    }
+  ],
+  "schema_version": "2.0",
+  "session_id": "session:v2-dual-graph-dashboard-architecture",
+  "summary": "v2 established the dual graph architecture. Graph and Logs are the only v2 core pages, the Governance Graph is the default dashboard view, and the Agent Memory Graph is the context and protocol graph for graph-governed loading."
+}

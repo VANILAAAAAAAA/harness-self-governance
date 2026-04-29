@@ -79,6 +79,15 @@ The repo manifest lives at `.agent/context.json`. Repo-local exports remain dete
 
 The dashboard embeds these generated artifacts as a read-only Router Panel/strip so reviewers can see route intent, selected artifacts, packet behavior, gap counts, pending-update counts, and the raw-session policy without invoking a backend. The budgeted context router is structured graph traversal, not RAG: no embeddings, vector DB, reranker, broad fallback search, or default raw-session replay. The dashboard is still static and read-only: no backend, no npm, no external CDN, no Hub-side LLM API, no destructive apply, no graph mutation execution, and no sensitive export.
 
+### Manual archive bootstrap fixtures
+
+The first production-quality manual archive pass is committed as curated examples under:
+
+- `docs/examples/agent-memory-graph/harness-self-governance/`
+- `docs/agent/manual-session-archive-bootstrap.md`
+
+These files are reviewable `compiled-session` inputs for `agent-graph archive-session`. They seed real project knowledge into the Agent Memory Graph without committing raw sessions, screenshots, or generated `artifacts/v2/` outputs.
+
 Legacy v2 helper commands remain available:
 
 ```bash

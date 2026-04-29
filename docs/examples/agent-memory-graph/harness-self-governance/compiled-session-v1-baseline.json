@@ -1,0 +1,78 @@
+{
+  "constraints": [
+    {
+      "id": "constraint:v1-no-destructive-apply",
+      "source": "session:v1-read-only-governance-baseline",
+      "text": "Destructive apply, delete, move, quarantine, rehydrate, and raw archive execution remain blocked in the v1.0 baseline."
+    },
+    {
+      "id": "constraint:v1-no-remote-publication",
+      "source": "session:v1-read-only-governance-baseline",
+      "text": "Remote publication actions require explicit approval and are not executed by the baseline pipeline."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "decision:v1-read-only-governance",
+      "source": "session:v1-read-only-governance-baseline",
+      "status": "accepted",
+      "text": "The v1.0 governance baseline is read-only and audit-first rather than execution-first."
+    },
+    {
+      "id": "decision:v1-identity-gates",
+      "source": "session:v1-read-only-governance-baseline",
+      "status": "accepted",
+      "text": "Repository identity checks and approval gates are mandatory before commit, push, tag, release, or publish actions."
+    }
+  ],
+  "graph_links": [
+    {
+      "source": "decision:v1-read-only-governance",
+      "target": "requirement:v1-local-rc-pipeline",
+      "type": "supports"
+    },
+    {
+      "source": "decision:v1-identity-gates",
+      "target": "requirement:v1-local-rc-pipeline",
+      "type": "supports"
+    },
+    {
+      "source": "decision:v1-read-only-governance",
+      "target": "constraint:v1-no-destructive-apply",
+      "type": "constrains"
+    },
+    {
+      "source": "decision:v1-identity-gates",
+      "target": "constraint:v1-no-remote-publication",
+      "type": "constrains"
+    },
+    {
+      "source": "decision:v1-read-only-governance",
+      "target": "protocol:graph-governed-context",
+      "type": "supports"
+    },
+    {
+      "source": "requirement:v1-provenance-state",
+      "target": "artifact:docs/project-status.md",
+      "type": "documented_by"
+    }
+  ],
+  "privacy": "local_only",
+  "profile_id": "general",
+  "project_id": "harness-self-governance",
+  "requirements": [
+    {
+      "id": "requirement:v1-local-rc-pipeline",
+      "source": "session:v1-read-only-governance-baseline",
+      "text": "The repository must provide a local-rc pipeline that validates identity, evidence, tests, and safety gates before release readiness."
+    },
+    {
+      "id": "requirement:v1-provenance-state",
+      "source": "session:v1-read-only-governance-baseline",
+      "text": "The governance baseline must emit observable provenance state and local evidence artifacts for review."
+    }
+  ],
+  "schema_version": "2.0",
+  "session_id": "session:v1-read-only-governance-baseline",
+  "summary": "v1.0 established the read-only governance baseline for harness-self-governance: identity checks, local-rc validation, provenance state, and approval-gated publication while destructive operations remain blocked."
+}
