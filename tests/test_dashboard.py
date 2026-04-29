@@ -90,6 +90,15 @@ def test_dashboard_file_generated_as_two_page_graph_logs_app() -> None:
         "view_in_logs_requires_mapping",
         "No projects archived for this profile yet",
         "Graph diagnostic summary",
+        "Context Router",
+        "Budgeted traversal",
+        "Raw sessions: forensic only",
+        "data-router-sample=\"view-in-logs\"",
+        "data-router-sample=\"log定位\"",
+        "data-router-sample=\"new-information\"",
+        "context_router",
+        "router-samples.json",
+        "context-index.json",
         "graph_summary",
         "graphs",
         "graph_summaries",
@@ -183,6 +192,11 @@ def test_dashboard_embeds_graph_logs_sessions_and_safety_data() -> None:
     assert data["lineage_index"]["schema_version"] == "2.0"
     assert data["pipeline_status"].get("llm_hub_api_enabled") is False
     assert data["pipeline_status"].get("agent_triggered_archive") is True
+    assert data["context_router"]["available"] is True
+    assert data["context_router"]["raw_sessions_default_read"] is False
+    assert data["context_router"]["raw_sessions_policy"] == "explicit_forensic_only"
+    assert data["context_router"]["index_path"].endswith("context-index.json")
+    assert {sample["id"] for sample in data["context_router"]["sample_queries"]} >= {"view-in-logs", "log定位", "new-information"}
 
 
 def test_collect_file_inventory_handles_missing_dirs_and_previews_json(tmp_path: Path) -> None:
