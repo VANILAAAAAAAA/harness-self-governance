@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "graph-harness-maintain"
-version = "1.1.0"
-description = "Local governance, audit, and reviewed-proposal pipeline for agent-maintained repositories."
+version = "2.0.0"
+description = "Local-first governance, dual-graph context, and archive-governed release pipeline for agent-maintained repositories."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -23,7 +23,7 @@ dependencies = []
 [project.scripts]
 ghm = "graph_harness_maintain.cli:main"
 graph-harness-maintain = "graph_harness_maintain.cli:main"
-agent-graph = "graph_harness_maintain.cli:main"
+agent-graph = "agent_memory_graph.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -35,4 +35,4 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/graph_harness_maintain"]
+packages = ["src/graph_harness_maintain", "src/agent_memory_graph"]

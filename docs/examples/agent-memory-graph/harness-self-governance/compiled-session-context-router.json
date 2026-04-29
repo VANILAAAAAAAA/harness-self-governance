@@ -1,0 +1,84 @@
+{
+  "constraints": [
+    {
+      "id": "constraint:no-embeddings-vector-db-reranker",
+      "source": "session:v2-budgeted-context-router",
+      "text": "The context router cannot depend on embeddings, a vector database, or a reranker."
+    },
+    {
+      "id": "constraint:no-default-raw-session-replay",
+      "source": "session:v2-budgeted-context-router",
+      "text": "Context misses cannot trigger default raw-session replay."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "decision:context-router-graph-traversal-not-rag",
+      "source": "session:v2-budgeted-context-router",
+      "status": "accepted",
+      "text": "The context router performs bounded graph traversal rather than embeddings, vector retrieval, reranking, or broad fallback search."
+    },
+    {
+      "id": "decision:context-router-route-packets",
+      "source": "session:v2-budgeted-context-router",
+      "status": "accepted",
+      "text": "Routing output is a deterministic context packet with budget, selected artifacts, and raw-session policy."
+    },
+    {
+      "id": "decision:context-router-pending-updates-and-gaps",
+      "source": "session:v2-budgeted-context-router",
+      "status": "accepted",
+      "text": "New information becomes pending updates and retrieval misses become context gaps instead of silent raw-session replay."
+    }
+  ],
+  "graph_links": [
+    {
+      "source": "decision:context-router-graph-traversal-not-rag",
+      "target": "constraint:no-embeddings-vector-db-reranker",
+      "type": "constrains"
+    },
+    {
+      "source": "decision:context-router-route-packets",
+      "target": "requirement:context-index-export",
+      "type": "supports"
+    },
+    {
+      "source": "decision:context-router-pending-updates-and-gaps",
+      "target": "constraint:no-default-raw-session-replay",
+      "type": "constrains"
+    },
+    {
+      "source": "decision:context-router-route-packets",
+      "target": "protocol:graph-governed-context",
+      "type": "implements"
+    },
+    {
+      "source": "decision:context-router-pending-updates-and-gaps",
+      "target": "artifact:docs/agent/budgeted-graph-traversal-context-router.md",
+      "type": "documented_by"
+    },
+    {
+      "source": "requirement:raw-sessions-forensic-only",
+      "target": "constraint:no-default-raw-session-replay",
+      "type": "constrains"
+    }
+  ],
+  "privacy": "local_only",
+  "profile_id": "general",
+  "project_id": "harness-self-governance",
+  "requirements": [
+    {
+      "id": "requirement:context-index-export",
+      "source": "session:v2-budgeted-context-router",
+      "text": "The router must export a context-index and sample packets so the dashboard can inspect real graph-governed routing behavior."
+    },
+    {
+      "id": "requirement:raw-sessions-forensic-only",
+      "source": "session:v2-budgeted-context-router",
+      "text": "Fast, normal, and deep budgets keep raw sessions disabled by default; only forensic mode can read them explicitly."
+    }
+  ],
+  "schema_version": "2.0",
+  "session_id": "session:v2-budgeted-context-router",
+  "summary": "The context router uses budgeted graph traversal instead of RAG. It builds a context-index, emits route packets, records pending updates and context gaps, and keeps raw sessions forensic-only unless explicitly requested."
+}

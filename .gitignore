@@ -12,6 +12,7 @@ build/
 # Local/private run outputs
 artifacts/v1/
 artifacts/v1.1/
+artifacts/v2/
 artifacts/
 reports/
 proposals/
@@ -34,6 +35,8 @@ ehr-data/
 *.sqlite3
 
 # Sessions and private Hermes state
+sessions/raw/
+sessions/private/
 sessions/
 session_*.json
 state.db
@@ -59,3 +62,7 @@ state.db
 Thumbs.db
 .vscode/
 .idea/
+
+# Local concept/reference images
+Concept map*.png
+Concept map*.png:Zone.Identifier

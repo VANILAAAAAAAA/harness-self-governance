@@ -1,15 +1,16 @@
 # graph-harness-maintain
 
-**Status:** v1.1 reviewed proposal baseline; release-hardening candidate.
+**Status:** v2.0.0 release hardening on `v2.0-dev` with feature scope frozen.
 
-`graph-harness-maintain` provides a conservative, local-only governance and audit pipeline for agent-maintained repositories. It inspects repository identity, release surface, approval gates, evidence, provenance, tests, smoke checks, leak scanning, and v1.1 reviewed-action proposal artifacts before any external publication step.
+`graph-harness-maintain` provides a conservative, local-only governance and audit pipeline for agent-maintained repositories. It inspects repository identity, release surface, approval gates, evidence, provenance, tests, smoke checks, leak scanning, and v2 graph-governed context artifacts before any external publication step.
 
 ## Project purpose
 
-The project keeps a maintenance harness observable, auditable, deterministic, and approval-gated. The implemented baseline has two local artifact tracks:
+The project keeps a maintenance harness observable, auditable, deterministic, and approval-gated. The implemented baseline now spans three local artifact tracks:
 
 - **v1.0 local governance pipeline:** read-only inspection, local artifact generation, evidence indexing, and release-candidate reports.
 - **v1.1 reviewed proposal layer:** proposal/template/adapter/provenance validation that remains proposal-only and does not execute reviewed actions.
+- **v2.0 dual-graph context layer:** Governance Graph + Agent Memory Graph, Graph + Logs dashboard, lineage-backed routing, archive lifecycle governance, and recommendation-only Archive Trigger Policy.
 
 ## Install
 
@@ -52,7 +53,58 @@ python -m graph_harness_maintain pipeline v1.1-rc
 python -m graph_harness_maintain pipeline v1.1-rc --strict
 ```
 
-Run proposal-layer checks directly:
+Run the v2.0 release-candidate pipeline and CLI surface checks:
+
+```bash
+python -m graph_harness_maintain pipeline v2.0-rc
+agent-graph --help
+agent-graph bootstrap --help
+agent-graph archive-session --help
+agent-graph maintenance --help
+agent-graph triggers --help
+```
+
+## v2.0 development: reusable global Agent Memory Graph protocol
+
+v2.0 promotes `graph-harness-maintain` from a repo-local dashboard into the reference implementation and dashboard/export target for a reusable global Agent Memory Graph protocol. The default context order is graph-first: global graph, active profile, active project, project summary, decision ledger, requirements, constraints, lineage index, mapped logs/artifacts, and raw sessions last.
+
+Use the portable `agent-graph` CLI to initialize repo manifests, bootstrap temporary memory roots, validate graph-governed context, build the budgeted traversal index, route task context, evaluate archive trigger policy, archive agent-compiled session JSON, and export repo-local dashboard artifacts:
+
+```bash
+agent-graph init-repo --repo . --profile general --project harness-self-governance
+TMP_MEM=$(mktemp -d)
+agent-graph bootstrap --repo . --memory-root "$TMP_MEM" --context-budget fast
+agent-graph build-index --repo . --memory-root "$TMP_MEM"
+agent-graph route --repo . --query "view in logs lineage mapping" --memory-root "$TMP_MEM" --context-budget fast
+agent-graph triggers report --repo . --memory-root "$TMP_MEM"
+agent-graph validate --repo . --memory-root "$TMP_MEM"
+agent-graph export --repo . --memory-root "$TMP_MEM"
+```
+
+The repo manifest lives at `.agent/context.json`. Repo-local exports remain deterministic under `artifacts/v2/`. The v2.0 RC pipeline also projects production router observability artifacts into `artifacts/v2/context/`:
+
+- `context-index.json`: graph-governed routing table exported from the temporary global memory root
+- `router-samples.json`: deterministic sample routes for evidence lookup, log-location lookup, and new-information capture
+- `context-packets.json`: full packets selected by budgeted traversal for each sample
+- `context-gaps.json`: retrieval misses/gaps, empty but present when no gaps exist
+- `pending-updates.json`: new-information items that should be compiled/archive-reviewed later
+- `context-router-report.json`: artifact availability, counts, and safety policy summary
+
+The dashboard embeds these generated artifacts as a read-only Router Panel/strip so reviewers can see route intent, selected artifacts, packet behavior, gap counts, pending-update counts, and the raw-session policy without invoking a backend. The budgeted context router is structured graph traversal, not RAG: no embeddings, vector DB, reranker, broad fallback search, or default raw-session replay. The dashboard remains Graph + Logs only in v2.0 and is still static and read-only: no backend, no npm, no external CDN, no Hub-side LLM API, no destructive apply, no graph mutation execution, and no sensitive export.
+
+### Manual archive bootstrap fixtures
+
+The first production-quality manual archive pass is committed as curated examples under:
+
+- `docs/examples/agent-memory-graph/harness-self-governance/`
+- `docs/agent/manual-session-archive-bootstrap.md`
+- `docs/agent/archive-lifecycle-governance.md`
+- `docs/agent/archive-trigger-policy.md`
+- `docs/agent/live-session-vs-compiled-memory-boundary.md`
+
+These files are reviewable `compiled-session` inputs for `agent-graph archive-session`. They seed real project knowledge into the Agent Memory Graph without committing raw sessions, screenshots, or generated `artifacts/v2/` outputs.
+
+Legacy v2 helper commands remain available:
 
 ```bash
 python -m graph_harness_maintain proposal create
@@ -158,6 +210,12 @@ python -m graph_harness_maintain pipeline local-rc --ci
 python -m graph_harness_maintain pipeline local-rc --strict
 python -m graph_harness_maintain pipeline v1.1-rc
 python -m graph_harness_maintain pipeline v1.1-rc --strict
+python -m graph_harness_maintain pipeline v2.0-rc
+agent-graph --help
+agent-graph bootstrap --help
+agent-graph archive-session --help
+agent-graph maintenance --help
+agent-graph triggers --help
 ```
 
 Before any local commit, verify the configured identity is the approved user-owned identity for the repository:
@@ -183,3 +241,9 @@ MIT. See [LICENSE](LICENSE).
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## v2.0 dual-graph architecture
+
+- `artifacts/v2/graph/governance-graph.json`: repo-wide Governance Graph for dashboard exploration and evidence navigation
+- `artifacts/v2/graph/agent-memory-graph.json`: Agent Memory Graph for graph-governed context loading
+- Dashboard Graph page defaults to Governance mode and can switch to Memory mode
