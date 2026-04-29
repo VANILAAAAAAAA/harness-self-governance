@@ -1,15 +1,16 @@
 # graph-harness-maintain
 
-**Status:** v2.0-dev reusable Agent Memory Graph reference implementation.
+**Status:** v2.0.0 release hardening on `v2.0-dev` with feature scope frozen.
 
 `graph-harness-maintain` provides a conservative, local-only governance and audit pipeline for agent-maintained repositories. It inspects repository identity, release surface, approval gates, evidence, provenance, tests, smoke checks, leak scanning, and v2 graph-governed context artifacts before any external publication step.
 
 ## Project purpose
 
-The project keeps a maintenance harness observable, auditable, deterministic, and approval-gated. The implemented baseline has two local artifact tracks:
+The project keeps a maintenance harness observable, auditable, deterministic, and approval-gated. The implemented baseline now spans three local artifact tracks:
 
 - **v1.0 local governance pipeline:** read-only inspection, local artifact generation, evidence indexing, and release-candidate reports.
 - **v1.1 reviewed proposal layer:** proposal/template/adapter/provenance validation that remains proposal-only and does not execute reviewed actions.
+- **v2.0 dual-graph context layer:** Governance Graph + Agent Memory Graph, Graph + Logs dashboard, lineage-backed routing, archive lifecycle governance, and recommendation-only Archive Trigger Policy.
 
 ## Install
 
@@ -52,6 +53,17 @@ python -m graph_harness_maintain pipeline v1.1-rc
 python -m graph_harness_maintain pipeline v1.1-rc --strict
 ```
 
+Run the v2.0 release-candidate pipeline and CLI surface checks:
+
+```bash
+python -m graph_harness_maintain pipeline v2.0-rc
+agent-graph --help
+agent-graph bootstrap --help
+agent-graph archive-session --help
+agent-graph maintenance --help
+agent-graph triggers --help
+```
+
 ## v2.0 development: reusable global Agent Memory Graph protocol
 
 v2.0 promotes `graph-harness-maintain` from a repo-local dashboard into the reference implementation and dashboard/export target for a reusable global Agent Memory Graph protocol. The default context order is graph-first: global graph, active profile, active project, project summary, decision ledger, requirements, constraints, lineage index, mapped logs/artifacts, and raw sessions last.
@@ -78,7 +90,7 @@ The repo manifest lives at `.agent/context.json`. Repo-local exports remain dete
 - `pending-updates.json`: new-information items that should be compiled/archive-reviewed later
 - `context-router-report.json`: artifact availability, counts, and safety policy summary
 
-The dashboard embeds these generated artifacts as a read-only Router Panel/strip so reviewers can see route intent, selected artifacts, packet behavior, gap counts, pending-update counts, and the raw-session policy without invoking a backend. The budgeted context router is structured graph traversal, not RAG: no embeddings, vector DB, reranker, broad fallback search, or default raw-session replay. The dashboard is still static and read-only: no backend, no npm, no external CDN, no Hub-side LLM API, no destructive apply, no graph mutation execution, and no sensitive export.
+The dashboard embeds these generated artifacts as a read-only Router Panel/strip so reviewers can see route intent, selected artifacts, packet behavior, gap counts, pending-update counts, and the raw-session policy without invoking a backend. The budgeted context router is structured graph traversal, not RAG: no embeddings, vector DB, reranker, broad fallback search, or default raw-session replay. The dashboard remains Graph + Logs only in v2.0 and is still static and read-only: no backend, no npm, no external CDN, no Hub-side LLM API, no destructive apply, no graph mutation execution, and no sensitive export.
 
 ### Manual archive bootstrap fixtures
 
@@ -198,6 +210,12 @@ python -m graph_harness_maintain pipeline local-rc --ci
 python -m graph_harness_maintain pipeline local-rc --strict
 python -m graph_harness_maintain pipeline v1.1-rc
 python -m graph_harness_maintain pipeline v1.1-rc --strict
+python -m graph_harness_maintain pipeline v2.0-rc
+agent-graph --help
+agent-graph bootstrap --help
+agent-graph archive-session --help
+agent-graph maintenance --help
+agent-graph triggers --help
 ```
 
 Before any local commit, verify the configured identity is the approved user-owned identity for the repository:
