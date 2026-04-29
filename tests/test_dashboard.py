@@ -99,6 +99,16 @@ def test_dashboard_file_generated_as_two_page_graph_logs_app() -> None:
         "context_router",
         "router-samples.json",
         "context-index.json",
+        "context-packets.json",
+        "context-gaps.json",
+        "pending-updates.json",
+        "Intent",
+        "Matched topics",
+        "Entry nodes",
+        "Selected artifacts",
+        "raw_sessions_allowed",
+        "requires_llm_gate",
+        "Context packet",
         "graph_summary",
         "graphs",
         "graph_summaries",
@@ -195,8 +205,21 @@ def test_dashboard_embeds_graph_logs_sessions_and_safety_data() -> None:
     assert data["context_router"]["available"] is True
     assert data["context_router"]["raw_sessions_default_read"] is False
     assert data["context_router"]["raw_sessions_policy"] == "explicit_forensic_only"
-    assert data["context_router"]["index_path"].endswith("context-index.json")
-    assert {sample["id"] for sample in data["context_router"]["sample_queries"]} >= {"view-in-logs", "log定位", "new-information"}
+    router = data["context_router"]
+    assert router["index_path"].endswith("context-index.json")
+    assert router["context_index"]["routing_table_type"] == "graph_traversal_context_index"
+    assert router["artifacts"]["context_packets"].endswith("context-packets.json")
+    assert router["artifacts"]["context_gaps"].endswith("context-gaps.json")
+    assert router["artifacts"]["pending_updates"].endswith("pending-updates.json")
+    assert {sample["id"] for sample in router["sample_queries"]} >= {"view-in-logs", "log定位", "new-information"}
+    samples = {sample["id"]: sample for sample in router["sample_queries"]}
+    assert samples["new-information"]["candidate_intents"] == ["new_information"]
+    assert samples["new-information"]["raw_sessions_allowed"] is False
+    assert samples["new-information"]["pending_update"] is True
+    assert samples["log定位"]["candidate_intents"] == ["retrieve_existing"]
+    assert samples["log定位"]["matched_topics"] or samples["log定位"]["matched_aliases"]
+    assert router["context_gaps"]["count"] == len(router["context_gaps"]["gaps"])
+    assert router["pending_updates"]["count"] == len(router["pending_updates"]["items"])
 
 
 def test_collect_file_inventory_handles_missing_dirs_and_previews_json(tmp_path: Path) -> None:

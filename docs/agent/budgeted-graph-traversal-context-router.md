@@ -146,6 +146,24 @@ The recommended packet has this shape:
 }
 ```
 
+
+## Repo-local observability artifacts
+
+`python -m graph_harness_maintain pipeline v2.0-rc` generates a deterministic, repo-local projection of router behavior under `artifacts/v2/context/`:
+
+| Artifact | Purpose |
+| --- | --- |
+| `context-index.json` | exported graph-governed routing table from the temporary memory root |
+| `router-samples.json` | fixed production smoke samples covering evidence route, log-location route, and new-information capture |
+| `context-packets.json` | the route outputs/context packets selected for each sample query |
+| `context-gaps.json` | context-gap audit output; present even when no gaps are found |
+| `pending-updates.json` | pending archive/update candidates produced by new-information samples |
+| `context-router-report.json` | counts, artifact paths, and safety policy summary |
+
+These artifacts are generated outputs and should not be committed. They let the static dashboard display real router behavior without a backend, Hub-side LLM API, model/provider UI, graph mutation execution, or raw-session fallback.
+
+The dashboard reads the exported artifacts as embedded JSON. The visible Router Panel is therefore an observability surface: it can show sample intent, budget, selected artifacts, packet size, gap count, pending-update count, and `raw_sessions_default_read=false`, but it does not execute archive, graph mutation, delete/move/quarantine/rehydrate, or raw archive apply.
+
 ## LLM boundary
 
 The external program owns routing, traversal, artifact path selection, budget control, packet generation, and gap audit.

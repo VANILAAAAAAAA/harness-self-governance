@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
+
+from agent_memory_graph.artifacts import build_context_router_artifacts
+from agent_memory_graph.bootstrap import bootstrap_repo as bootstrap_agent_graph_repo
+from agent_memory_graph.export import export_repo_projection
 
 from .graph_export import write_governance_graph
 from .lineage_index import write_lineage_index
@@ -325,6 +330,12 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
     profile_index_path = repo_root / "artifacts" / "v2" / "profiles" / "profile-index.json"
     project_manifest_path = repo_root / "artifacts" / "v2" / "projects" / DEFAULT_PROFILE_ID / DEFAULT_PROJECT_ID / "project-manifest.json"
     lineage_path = repo_root / "artifacts" / "v2" / "lineage" / "log-index.json"
+    context_root = repo_root / "artifacts" / "v2" / "context"
+    context_index_path = context_root / "context-index.json"
+    router_samples_path = context_root / "router-samples.json"
+    context_packets_path = context_root / "context-packets.json"
+    context_gaps_path = context_root / "context-gaps.json"
+    pending_updates_path = context_root / "pending-updates.json"
     if not profile_index_path.exists():
         write_profile_index(repo_root)
     if not project_manifest_path.exists():
@@ -333,6 +344,11 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         write_governance_graph(repo_root, governance_graph_path)
     if not lineage_path.exists():
         write_lineage_index(repo_root)
+    if not all(path.exists() for path in (context_index_path, router_samples_path, context_packets_path, context_gaps_path, pending_updates_path)):
+        with TemporaryDirectory(prefix="agent-memory-graph-dashboard-") as temp_memory_root:
+            bootstrap_agent_graph_repo(repo_root, temp_memory_root, context_budget="fast")
+            export_repo_projection(repo_root, temp_memory_root)
+            build_context_router_artifacts(repo_root, temp_memory_root, context_root)
     session_path = ensure_session_index(repo_root)
     governance_graph = _ensure_dashboard_graph_context(_load_json(governance_graph_path))
     memory_graph = _ensure_dashboard_graph_context(_load_json(memory_graph_path)) if memory_graph_path.exists() else {"nodes": [], "edges": [], "summary": {"global_agent_memory_graph_supported": False}}
@@ -356,19 +372,33 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
     graph_summaries = {"governance": graph_summary, "memory": memory_graph_summary}
     graph_filter_catalog = {name: sorted({node.get("type", "unknown") for node in graph.get("nodes", [])}) for name, graph in graphs.items()}
     edge_filter_catalog = {name: sorted({edge.get("relation") or edge.get("type", "unknown") for edge in graph.get("edges", [])}) for name, graph in graphs.items()}
+    context_index = _load_json(context_index_path)
+    router_samples = _load_json(router_samples_path)
+    context_packets = _load_json(context_packets_path)
+    context_gaps = _load_json(context_gaps_path) or {"schema_version": "2.0", "gaps": [], "count": 0}
+    pending_updates = _load_json(pending_updates_path) or {"schema_version": "2.0", "items": [], "count": 0}
+    packet_samples = context_packets.get("samples", [])
     context_router = {
-        "available": True,
+        "available": bool(context_index and context_packets),
         "protocol": "graph-governed-context",
         "default_budget": "fast",
         "raw_sessions_policy": "explicit_forensic_only",
         "raw_sessions_default_read": False,
-        "index_path": "<memory-root>/index/context-index.json",
+        "index_path": "artifacts/v2/context/context-index.json",
         "samples_path": "artifacts/v2/context/router-samples.json",
-        "sample_queries": [
-            {"id": "view-in-logs", "label": "Find evidence", "query": "view selected graph item in logs", "intent": "retrieve_existing"},
-            {"id": "log定位", "label": "Log mapping", "query": "log定位：decision lineage", "intent": "retrieve_existing"},
-            {"id": "new-information", "label": "Capture update", "query": "new decision: raw sessions stay last", "intent": "capture_pending_update"},
-        ],
+        "artifacts": {
+            "context_index": "artifacts/v2/context/context-index.json",
+            "router_samples": "artifacts/v2/context/router-samples.json",
+            "context_packets": "artifacts/v2/context/context-packets.json",
+            "context_gaps": "artifacts/v2/context/context-gaps.json",
+            "pending_updates": "artifacts/v2/context/pending-updates.json",
+        },
+        "context_index": context_index,
+        "router_samples": router_samples,
+        "context_packets": context_packets,
+        "context_gaps": context_gaps,
+        "pending_updates": pending_updates,
+        "sample_queries": packet_samples,
         "read_order": ["global graph", "active profile", "active project", "project summary", "decision ledger", "requirements / constraints", "lineage index", "mapped logs / artifacts", "raw sessions last"],
     }
     return {
@@ -413,6 +443,10 @@ def _html(data: dict[str, Any]) -> str:
         if manifest
     ) or '<option value="harness-self-governance">harness-self-governance</option>'
     payload = _safe_json_for_script(data)
+    router_buttons = "".join(
+        f'<button class="router-sample" data-router-sample="{sample.get("id")}">{sample.get("label", sample.get("id"))}</button>'
+        for sample in data.get("context_router", {}).get("sample_queries", [])
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -472,7 +506,7 @@ pre {{ margin:0; white-space:pre-wrap; overflow:auto; max-height:52vh; backgroun
 <main>
 <section class="route active content" data-route="graph" id="graph-route"><div class="page-head"><div><h1 id="graph-title">Governance Graph</h1><div class="subtitle" id="graph-subtitle">Interactive view of tools, knowledge, policies, artifacts, proposals, sessions, and provenance.</div></div><div class="health-row"><div class="status-card"><small>System Health</small><strong class="ok">{status}</strong></div><div class="status-card"><small>Nodes</small><strong id="graph-node-total">{len(nodes)}</strong></div><div class="status-card"><small>Edges</small><strong id="graph-edge-total">{len(edges)}</strong></div><div class="status-card"><small>Safety</small><strong class="warn">READ ONLY</strong></div></div></div>
 <div class="logic-flow" aria-label="Logic Flow"><strong>Logic Flow</strong><span>Profile</span><span class="arrow">→</span><span>Project</span><span class="arrow">→</span><span>Session Knowledge</span><span class="arrow">→</span><span>Governance Graph</span><span class="arrow">→</span><span>Agent Memory Graph</span><span class="arrow">→</span><span>Dashboard</span><span class="arrow">→</span><span>Logs</span></div>
-<div class="router-strip" id="context-router-strip" aria-label="Context Router"><span><strong>Context Router</strong> · Budgeted traversal · <code>context-index.json</code> · Raw sessions: forensic only · Samples export: <code>router-samples.json</code></span><span class="router-samples"><button class="router-sample" data-router-sample="view-in-logs">Evidence route</button><button class="router-sample" data-router-sample="log定位">Log 定位</button><button class="router-sample" data-router-sample="new-information">New info</button></span></div>
+<div class="router-strip" id="context-router-strip" aria-label="Context Router"><span><strong>Context Router</strong> · Budgeted traversal · <code>context-index.json</code> · Raw sessions: forensic only · Samples export: <code>router-samples.json</code> · Packets: <code>context-packets.json</code></span><span class="router-samples">{router_buttons}</span></div>
 <div class="graph-workspace"><div class="graph-main"><div class="toolbar"><div class="toolbar-left"><label class="project-selector" id="project-selector">Project: <select id="project-select" aria-label="Project selector">{project_options}</select></label><input id="graph-search" class="search" placeholder="Search visible graph"><button class="btn" id="fit-view">Fit view</button><button class="btn" id="focus-hubs">Focus hubs</button><details class="filter-panel" id="filter-panel"><summary>Filters</summary><div class="type-filter-panel" id="type-filter-panel"><span class="subtitle">Node filters</span><span id="type-filter-chips"></span></div><div class="type-filter-panel"><span class="subtitle">Edge filters</span><span id="edge-filter-chips"></span><button class="btn" id="clear-edge-filters">All edges</button><button class="btn" id="clear-graph-filters">Clear filters</button></div></details></div><div class="legend" id="graph-legend"></div><span class="count-pill" id="visible-node-count">0 visible nodes</span></div><div class="mode-switch" aria-label="Graph dataset mode"><strong>Graph mode</strong><button class="btn mode-btn" data-graph-dataset="governance" aria-pressed="true">Governance (default)</button><button class="btn mode-btn" data-graph-dataset="memory" aria-pressed="false">Memory</button><span class="subtitle" id="graph-dataset-help">Governance = repo-wide asset graph. Memory = agent context/protocol graph.</span></div><div class="mode-switch" aria-label="Graph view mode"><button class="btn mode-btn" data-graph-mode="overview" aria-pressed="true" title="Curated 10-25 high-value nodes">Overview · curated</button><button class="btn mode-btn" data-graph-mode="focus" aria-pressed="false" title="Selected node plus immediate neighbors">Focus · 1-hop</button><button class="btn mode-btn" data-graph-mode="full" aria-pressed="false" title="All nodes and edges for debugging">Full graph</button><span class="subtitle" id="mode-help">Overview = curated system map. Focus = selected item plus 1-hop neighbors. Full graph = debug/all nodes.</span></div><div class="graph-canvas-wrap" id="graph-wrap"><svg id="graph-canvas" role="img" aria-label="Governance Graph"><defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#a8b2c7"></path></marker></defs><g id="viewport"><g id="edge-layer"></g><g id="node-layer"></g></g></svg><div class="float-controls"><button id="zoom-in">+</button><button id="zoom-out">−</button><button id="zoom-reset">⌂</button><button title="Read-only lock">🔒</button></div><div class="minimap" id="minimap"></div></div><div class="graph-hint">ⓘ Drag nodes to reposition · Click nodes or edges to inspect · Edge filters reduce dense views · Scroll to zoom · Double-click empty space to reset view</div></div><aside class="inspector"><div class="tabs" role="tablist" aria-label="Inspector views"><button class="tab active" role="tab" data-inspector-tab="inspect" aria-selected="true">Inspect</button><button class="tab" role="tab" data-inspector-tab="edge" aria-selected="false" id="edge-inspector">Edge</button><button class="tab" role="tab" data-inspector-tab="summary" aria-selected="false">Summary</button></div><h2 id="node-inspector">Graph diagnostic summary</h2><div class="kv" id="inspector-body"></div><a class="btn logs-link" href="#/logs" id="view-in-logs">View in Logs →</a><div class="mapping-note" id="log-mapping-note">Log mapping uses exact indexed local artifact paths only.</div></aside></div>
 </section>
 <section class="route content" data-route="logs" id="logs-route"><div class="page-head"><div><h1>Logs</h1><div class="subtitle">Browse and inspect raw local artifacts, metadata, and lineage. No actions execute from this page.</div></div><div class="top-actions"><a class="btn primary" href="#/graph">Graph</a><span class="badge">READ ONLY</span></div></div><div class="logs-scroll-hint"><span>Use the File Explorer, Table, and Preview scrollbars for lower content</span><span>No browser page scroll</span></div><div class="logs-layout"><aside class="explorer"><div class="pane-head"><strong>File Explorer</strong><span class="badge" id="explorer-count">0 items</span></div><ul class="tree" id="file-tree"></ul></aside><section class="file-table"><div class="pane-head"><div><strong id="folder-title">artifacts/</strong> <span class="badge" id="table-count">0 items</span></div><div><input id="file-search" class="search" placeholder="Search files and folders"><div class="scroll-actions"><button class="scroll-btn" id="table-scroll-up">↑ table</button><button class="scroll-btn" id="table-scroll-down">↓ table</button></div></div></div><div class="file-table-scroll" id="file-table-scroll"><table><thead><tr><th>Name / Path</th><th>Type</th><th>Size</th><th>Modified</th><th>Level/Status</th></tr></thead><tbody id="file-rows"></tbody></table></div></section><aside class="preview-panel" id="preview-panel"><div class="file-title"><div><h2 id="preview-title">Select a file</h2><div class="subtitle" id="preview-subtitle">Preview, Raw, Metadata, and Lineage</div></div><button class="btn" id="copy-path">Copy path</button></div><div class="preview-tabs"><button class="active" data-preview-tab="preview">Preview</button><button data-preview-tab="raw">Raw</button><button data-preview-tab="metadata">Metadata</button><button data-preview-tab="lineage">Lineage</button></div><div class="preview-toolbar"><button class="scroll-btn" id="preview-scroll-up">↑ preview</button><button class="scroll-btn" id="preview-scroll-down">↓ preview</button></div><pre id="preview-code">No file selected.</pre><section><h3>Lineage</h3><div class="lineage-flow" id="lineage-flow"></div></section></aside></div></section>
@@ -595,7 +629,7 @@ graphCanvas.addEventListener('contextmenu', ev => ev.preventDefault());
 document.getElementById('zoom-in').onclick=()=>{{panZoomState.scale+=.15; applyZoom();}}; document.getElementById('zoom-out').onclick=()=>{{panZoomState.scale=Math.max(.35,panZoomState.scale-.15); applyZoom();}}; document.getElementById('zoom-reset').onclick=()=>{{panZoomState={{x:20,y:20,scale:1}}; applyZoom();}}; document.getElementById('fit-view').onclick=()=>fitGraphToVisible();
 document.querySelectorAll('[data-inspector-tab]').forEach(btn=>btn.onclick=()=>setInspectorTab(btn.dataset.inspectorTab));
 function setGraphMode(mode) {{ activeGraphMode=mode; document.querySelectorAll('[data-graph-mode]').forEach(btn=>btn.setAttribute('aria-pressed', String(btn.dataset.graphMode===mode))); if(mode==='focus' && !focusNodeId) {{ const hub=(DATA.graph_summary.hubs||[])[0]; focusNodeId=hub && hub.id; }} renderGraph(true); }}
-function applyRouterSample(sampleId) {{ const sample=((DATA.context_router||{{}}).sample_queries||[]).find(item=>item.id===sampleId); if(!sample) return; const input=document.getElementById('graph-search'); if(input) input.value=sample.query || ''; if(sampleId==='new-information') applyGraphDataset('memory'); renderLegend(); renderTypeFilters(); renderEdgeFilters(); renderGraph(true); renderGraphSummary(true); const note=document.getElementById('log-mapping-note'); if(note) note.textContent=`Context Router sample: ${{sample.label}} · intent=${{sample.intent}} · budget=${{(DATA.context_router||{{}}).default_budget || 'fast'}} · raw sessions stay last.`; }}
+function applyRouterSample(sampleId) {{ const sample=((DATA.context_router||{{}}).sample_queries||[]).find(item=>item.id===sampleId); if(!sample) return; const input=document.getElementById('graph-search'); if(input) input.value=sample.query || ''; if(sample.candidate_intents && sample.candidate_intents.includes('new_information')) applyGraphDataset('memory'); renderLegend(); renderTypeFilters(); renderEdgeFilters(); renderGraph(true); activeInspectorTab='summary'; syncInspectorTabs(); document.getElementById('node-inspector').textContent=`Context Router · ${{sample.label || sample.id}}`; const selectedArtifacts=(sample.selected_artifacts||[]).map(a=>a.path || a.kind || JSON.stringify(a)).join(', ') || '—'; const packet=sample.recommended_context_packet || {{}}; document.getElementById('inspector-body').innerHTML = kv({{Intent:(sample.candidate_intents||[]).join(', ') || '—', Budget:sample.context_budget || 'fast', 'Matched topics':(sample.matched_topics||[]).join(', ') || '—', 'Matched aliases':(sample.matched_aliases||[]).join(', ') || '—', 'Entry nodes':(sample.entry_nodes||[]).join(', ') || '—', 'Selected artifacts':selectedArtifacts, raw_sessions_allowed:sample.raw_sessions_allowed, requires_llm_gate:sample.requires_llm_gate, 'Pending update':sample.pending_update ? 'true' : 'false', 'Context packet':sample.context_packet_ref || 'artifacts/v2/context/context-packets.json', 'Routing reason':sample.routing_reason || packet.routing_reason || '—'}}); const note=document.getElementById('log-mapping-note'); if(note) note.textContent=`Context Router sample from router artifacts: ${{sample.label}} · intent=${{(sample.candidate_intents||[]).join(', ')}} · budget=${{sample.context_budget || 'fast'}} · raw_sessions_allowed=${{sample.raw_sessions_allowed}} · requires_llm_gate=${{sample.requires_llm_gate}}.`; }}
 document.querySelectorAll('[data-router-sample]').forEach(btn=>btn.onclick=()=>applyRouterSample(btn.dataset.routerSample));
 document.querySelectorAll('[data-graph-mode]').forEach(btn=>btn.onclick=()=>setGraphMode(btn.dataset.graphMode)); document.querySelectorAll('[data-graph-dataset]').forEach(btn=>btn.onclick=()=>{{ applyGraphDataset(btn.dataset.graphDataset); renderLegend(); renderTypeFilters(); renderEdgeFilters(); renderGraph(true); renderGraphSummary(true); updateViewInLogsControl(); }}); document.getElementById('graph-search').addEventListener('input', ()=>renderGraph(true)); document.getElementById('clear-graph-filters').onclick=clearGraphFilters; document.getElementById('clear-edge-filters').onclick=()=>{{activeEdgeTypes=new Set(DATA.edge_filter_types || []); renderEdgeFilters(); renderGraph(true);}}; document.getElementById('focus-hubs').onclick=()=>{{const hub=(DATA.graph_summary.hubs||[])[0]; if(hub) {{ focusNodeId=hub.id; setGraphMode('focus'); selectHub(hub.id); }} }}; document.getElementById('view-in-logs').onclick=(ev)=>{{ev.preventDefault(); if(ev.currentTarget.getAttribute('aria-disabled')==='true') return; viewSelectedGraphInLogs();}};
 function renderMinimap(ids) {{ const mini=document.getElementById('minimap'); mini.innerHTML=''; Object.entries(positions).filter(([id]) => !ids || ids.has(id)).slice(0,80).forEach(([id,p]) => {{ const node=DATA.graph.nodes.find(n=>n.id===id)||{{type:'requirement'}}; const d=document.createElement('i'); d.className='mini-node'; d.style.left=(8+(p.x%120))+'px'; d.style.top=(10+(p.y%60))+'px'; d.style.background=(colorMap[node.type]||colorMap.requirement)[1]; mini.appendChild(d); }}); }}

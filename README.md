@@ -68,7 +68,16 @@ agent-graph validate --repo . --memory-root "$TMP_MEM"
 agent-graph export --repo . --memory-root "$TMP_MEM"
 ```
 
-The repo manifest lives at `.agent/context.json`. Repo-local exports remain deterministic under `artifacts/v2/`. The budgeted context router is structured graph traversal, not RAG: no embeddings, vector DB, reranker, broad fallback search, or default raw-session replay. The dashboard is still static and read-only: no backend, no npm, no external CDN, no Hub-side LLM API, no destructive apply, no graph mutation execution, and no sensitive export.
+The repo manifest lives at `.agent/context.json`. Repo-local exports remain deterministic under `artifacts/v2/`. The v2.0 RC pipeline also projects production router observability artifacts into `artifacts/v2/context/`:
+
+- `context-index.json`: graph-governed routing table exported from the temporary global memory root
+- `router-samples.json`: deterministic sample routes for evidence lookup, log-location lookup, and new-information capture
+- `context-packets.json`: full packets selected by budgeted traversal for each sample
+- `context-gaps.json`: retrieval misses/gaps, empty but present when no gaps exist
+- `pending-updates.json`: new-information items that should be compiled/archive-reviewed later
+- `context-router-report.json`: artifact availability, counts, and safety policy summary
+
+The dashboard embeds these generated artifacts as a read-only Router Panel/strip so reviewers can see route intent, selected artifacts, packet behavior, gap counts, pending-update counts, and the raw-session policy without invoking a backend. The budgeted context router is structured graph traversal, not RAG: no embeddings, vector DB, reranker, broad fallback search, or default raw-session replay. The dashboard is still static and read-only: no backend, no npm, no external CDN, no Hub-side LLM API, no destructive apply, no graph mutation execution, and no sensitive export.
 
 Legacy v2 helper commands remain available:
 

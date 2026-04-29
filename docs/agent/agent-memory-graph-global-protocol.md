@@ -167,3 +167,8 @@ Future repositories can adopt the protocol by:
 2. running `agent-graph init-repo`
 3. bootstrapping a temporary or user-owned memory root
 4. exporting graph/project/lineage artifacts into repo-local paths
+
+
+## Context Router observability export
+
+For repository dashboard review, run `python -m graph_harness_maintain pipeline v2.0-rc`. The pipeline uses a temporary memory root and writes read-only router projections to `artifacts/v2/context/`, including `context-index.json`, `router-samples.json`, `context-packets.json`, `context-gaps.json`, `pending-updates.json`, and `context-router-report.json`. Treat these as generated artifacts: inspect them locally, load them in the static dashboard, but do not commit them. They preserve the graph-first policy and keep raw sessions as explicit forensic-only context.

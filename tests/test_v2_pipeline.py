@@ -58,6 +58,37 @@ def test_v2_pipeline_reports_read_only_safety_boundary() -> None:
     assert data["graph_governed_context_protocol"] is True
     assert data["raw_sessions_default_read"] is False
     assert data["agent_graph_cli_available"] is True
+    assert data["context_router_artifacts_available"] is True
+    assert data["context_index_available"] is True
+    assert data["router_samples_available"] is True
+    assert data["context_packets_available"] is True
+    assert data["context_gaps_available"] is True
+    assert data["pending_updates_available"] is True
+    assert data["raw_sessions_policy"] == "explicit_forensic_only"
+    for path in [
+        "artifacts/v2/context/context-index.json",
+        "artifacts/v2/context/router-samples.json",
+        "artifacts/v2/context/context-packets.json",
+        "artifacts/v2/context/context-gaps.json",
+        "artifacts/v2/context/pending-updates.json",
+    ]:
+        assert path in data["artifacts"]
+        assert (ROOT / path).exists()
+
+    packets = json.loads((ROOT / "artifacts" / "v2" / "context" / "context-packets.json").read_text(encoding="utf-8"))
+    by_id = {item["id"]: item for item in packets["samples"]}
+    assert by_id["new-information"]["candidate_intents"] == ["new_information"]
+    assert by_id["new-information"]["raw_sessions_allowed"] is False
+    assert by_id["new-information"]["pending_update"] is True
+    assert by_id["log定位"]["candidate_intents"] == ["retrieve_existing"]
+    assert by_id["log定位"]["raw_sessions_allowed"] is False
+    assert by_id["log定位"]["matched_topics"] or by_id["log定位"]["matched_aliases"]
+    gaps = json.loads((ROOT / "artifacts" / "v2" / "context" / "context-gaps.json").read_text(encoding="utf-8"))
+    pending = json.loads((ROOT / "artifacts" / "v2" / "context" / "pending-updates.json").read_text(encoding="utf-8"))
+    assert gaps["schema_version"] == "2.0"
+    assert "gaps" in gaps and gaps["count"] == len(gaps["gaps"])
+    assert pending["schema_version"] == "2.0"
+    assert "items" in pending and pending["count"] == len(pending["items"])
 
 
 def test_v2_pipeline_cli_command_writes_pipeline_run() -> None:
@@ -69,6 +100,7 @@ def test_v2_pipeline_cli_command_writes_pipeline_run() -> None:
     assert path.exists()
     persisted = json.loads(path.read_text(encoding="utf-8"))
     assert persisted["graph_mutation_allowed"] is False
+    assert persisted["context_router_artifacts_available"] is True
 
 
 def test_v2_cli_help_commands_work() -> None:

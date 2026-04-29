@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from agent_memory_graph.artifacts import build_context_router_artifacts
 from agent_memory_graph.bootstrap import bootstrap_repo as bootstrap_agent_graph_repo, validate_repo as validate_agent_graph_repo
 from agent_memory_graph.context_index import build_context_index
 from agent_memory_graph.export import export_repo_projection
@@ -459,6 +460,7 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
         agent_graph_validation = validate_agent_graph_repo(repo_root, temp_memory_root)
         context_index = build_context_index(repo_root, temp_memory_root)
         memory_graph_export = export_repo_projection(repo_root, temp_memory_root)
+        context_router_artifacts = build_context_router_artifacts(repo_root, temp_memory_root, artifacts_root / "context")
     governance_graph = write_governance_graph(repo_root, artifacts_root / "graph" / "governance-graph.json")
     dashboard = build_dashboard(repo_root, artifacts_root / "dashboard" / "index.html")
     session_raw_committed = _raw_sessions_committed(repo_root)
@@ -472,6 +474,7 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
         "agent_graph_validation": agent_graph_validation,
         "context_index": context_index,
         "memory_graph_export": memory_graph_export,
+        "context_router_artifacts": context_router_artifacts,
         "governance_graph": governance_graph,
         "dashboard": dashboard,
     }
@@ -516,7 +519,13 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
         "raw_sessions_default_read": False,
         "agent_graph_cli_available": True,
         "budgeted_context_router_supported": True,
-        "context_index_available": context_index.get("status") == "PASS",
+        "context_router_artifacts_available": context_router_artifacts.get("status") == "PASS",
+        "context_index_available": context_index.get("status") == "PASS" and (artifacts_root / "context" / "context-index.json").exists(),
+        "router_samples_available": (artifacts_root / "context" / "router-samples.json").exists(),
+        "context_packets_available": (artifacts_root / "context" / "context-packets.json").exists(),
+        "context_gaps_available": (artifacts_root / "context" / "context-gaps.json").exists(),
+        "pending_updates_available": (artifacts_root / "context" / "pending-updates.json").exists(),
+        "raw_sessions_policy": "explicit_forensic_only",
         "graph_traversal_context_protocol": True,
         "novelty_aware_context_policy": True,
         "blockers": blockers,
@@ -531,6 +540,11 @@ def run_v2_0_rc(repo_root: Path, stage_overrides: dict | None = None) -> dict:
             "artifacts/v2/projects/general/harness-self-governance/project-manifest.json",
             "artifacts/v2/projects/general/harness-self-governance/project-summary.json",
             "artifacts/v2/lineage/log-index.json",
+            "artifacts/v2/context/context-index.json",
+            "artifacts/v2/context/router-samples.json",
+            "artifacts/v2/context/context-packets.json",
+            "artifacts/v2/context/context-gaps.json",
+            "artifacts/v2/context/pending-updates.json",
             "artifacts/v2/pipeline-run.json",
         ],
         "exit_code": PASS if not blockers else FAIL,
