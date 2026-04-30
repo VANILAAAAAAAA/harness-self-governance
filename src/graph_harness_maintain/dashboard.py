@@ -13,7 +13,7 @@ from agent_memory_graph.export import export_repo_projection
 from agent_memory_graph.maintenance import generate_archive_maintenance_proposal, write_archive_maintenance_report
 from agent_memory_graph.pending_lifecycle import compile_pending_updates
 
-from .graph_export import write_governance_graph
+from .graph_export import write_governance_graph, _memory_root_candidates
 from .lineage_index import write_lineage_index
 from .profiles import write_profile_index
 from .projects import DEFAULT_PROJECT_ID, DEFAULT_PROFILE_ID, init_project
@@ -359,6 +359,26 @@ def _dashboard_project_catalog(repo_root: Path, default_manifest: dict[str, Any]
             }
         )
         summaries.append(dirty_summary or {"profile_id": profile_id, "project_id": project_id, "summary": "ehrlab dirtycsv project", "decisions": [], "requirements": [], "constraints": [], "graph_links": []})
+    seen = {(item.get("profile_id"), item.get("project_id")) for item in manifests if item}
+    summary_seen = {(item.get("profile_id"), item.get("project_id")) for item in summaries if item}
+    for memory_root in _memory_root_candidates():
+        projects_root = memory_root / "projects"
+        if not projects_root.exists():
+            continue
+        for manifest_path in sorted(projects_root.glob("*/*/project-manifest.json")):
+            manifest = _load_json(manifest_path)
+            if not manifest:
+                continue
+            profile_id = manifest.get("profile_id") or manifest_path.parent.parent.name
+            project_id = manifest.get("project_id") or manifest_path.parent.name
+            key = (profile_id, project_id)
+            if key not in seen:
+                manifests.append({**manifest, "profile_id": profile_id, "project_id": project_id})
+                seen.add(key)
+            summary = _load_json(manifest_path.parent / "project-summary.json")
+            if summary and key not in summary_seen:
+                summaries.append({**summary, "profile_id": profile_id, "project_id": project_id})
+                summary_seen.add(key)
     return manifests, summaries
 
 
@@ -473,8 +493,7 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         write_profile_index(repo_root)
     if not project_manifest_path.exists():
         init_project(repo_root, DEFAULT_PROFILE_ID, DEFAULT_PROJECT_ID)
-    if not governance_graph_path.exists():
-        write_governance_graph(repo_root, governance_graph_path)
+    write_governance_graph(repo_root, governance_graph_path)
     if not lineage_path.exists():
         write_lineage_index(repo_root)
     if not all(path.exists() for path in (context_index_path, router_samples_path, context_packets_path, context_gaps_path, pending_updates_path, archive_gate_path, archive_maintenance_path, archive_proposal_path, archive_trigger_path, pending_compilation_path)):

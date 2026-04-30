@@ -278,6 +278,41 @@ def test_dashboard_embeds_graph_logs_sessions_and_safety_data() -> None:
     assert data["runtime_observability"]["raw_sessions_allowed_count"] == 0
 
 
+def test_dashboard_catalog_imports_memory_root_projects(tmp_path: Path, monkeypatch) -> None:
+    memory_root = tmp_path / "memory"
+    project_dir = memory_root / "projects" / "general" / "564"
+    project_dir.mkdir(parents=True)
+    (memory_root / "profiles" / "general").mkdir(parents=True)
+    (memory_root / "profiles" / "general" / "profile.json").write_text(
+        json.dumps({"profile_id": "general", "projects": ["564"]}),
+        encoding="utf-8",
+    )
+    (project_dir / "project-manifest.json").write_text(
+        json.dumps({"profile_id": "general", "project_id": "564", "title": "Project 564", "sessions": []}),
+        encoding="utf-8",
+    )
+    (project_dir / "project-summary.json").write_text(
+        json.dumps({"profile_id": "general", "project_id": "564", "summary": "course project bootstrap"}),
+        encoding="utf-8",
+    )
+    (project_dir / "graph-fragment.json").write_text(
+        json.dumps(
+            {
+                "nodes": [{"id": "requirement:564-bootstrap", "type": "requirement", "label": "bootstrap frame"}],
+                "edges": [{"source": "project:general:564", "target": "requirement:564-bootstrap", "type": "requires"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AGENT_MEMORY_GRAPH_ROOT", str(memory_root))
+
+    data = build_dashboard_data(ROOT)
+
+    assert ("general", "564") in {(m.get("profile_id"), m.get("project_id")) for m in data["projects"]["manifests"]}
+    assert any(node["id"] == "project:general:564" for node in data["graph"]["nodes"])
+    assert any(node["id"] == "requirement:564-bootstrap" for node in data["graph"]["nodes"])
+
+
 def test_collect_file_inventory_handles_missing_dirs_and_previews_json(tmp_path: Path) -> None:
     repo = tmp_path
     sample = repo / "artifacts" / "v2" / "graph" / "governance-graph.json"

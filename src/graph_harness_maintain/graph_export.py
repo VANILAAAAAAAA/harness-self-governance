@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -128,30 +129,163 @@ def _load_json(path: Path) -> dict[str, Any] | None:
         return None
 
 
+def _memory_root_candidates() -> list[Path]:
+    candidates: list[Path] = []
+    env_root = os.environ.get("AGENT_MEMORY_GRAPH_ROOT")
+    if env_root:
+        candidates.append(Path(env_root).expanduser())
+    candidates.extend(
+        [
+            Path("~/.agent-memory-graph").expanduser(),
+            Path.home() / ".hermes" / "profiles" / "general" / "home" / ".agent-memory-graph",
+        ]
+    )
+    seen: set[str] = set()
+    out: list[Path] = []
+    for candidate in candidates:
+        key = candidate.resolve().as_posix() if candidate.exists() else candidate.expanduser().as_posix()
+        if key not in seen and candidate.exists():
+            seen.add(key)
+            out.append(candidate)
+    return out
+
+
+def _memory_project_dir(profile_id: str, project_id: str) -> Path | None:
+    for memory_root in _memory_root_candidates():
+        root = memory_root / "projects" / profile_id / project_id
+        if root.exists():
+            return root
+    return None
+
+
+def _merge_profile_indexes(base: dict[str, Any], overlays: list[dict[str, Any]]) -> dict[str, Any]:
+    profiles: dict[str, dict[str, Any]] = {}
+    for item in base.get("profiles", []):
+        profile_id = item.get("profile_id")
+        if profile_id:
+            profiles[profile_id] = dict(item)
+    for overlay in overlays:
+        for item in overlay.get("profiles", []):
+            profile_id = item.get("profile_id")
+            if not profile_id:
+                continue
+            merged = dict(profiles.get(profile_id, {}))
+            merged.update({key: value for key, value in item.items() if key != "projects"})
+            merged["projects"] = sorted(set(merged.get("projects", [])) | set(item.get("projects", [])))
+            profiles[profile_id] = merged
+    return {
+        **base,
+        "profiles": [profiles[key] for key in sorted(profiles)],
+        "warnings": sorted(set(base.get("warnings", []))),
+    }
+
+
+def _profile_index_from_memory_root(memory_root: Path) -> dict[str, Any]:
+    profiles: list[dict[str, Any]] = []
+    for profile_file in sorted((memory_root / "profiles").glob("*/profile.json")):
+        profile = _load_json(profile_file)
+        if profile:
+            profile_id = profile.get("profile_id") or profile_file.parent.name
+            projects = set(profile.get("projects", []))
+            project_parent = memory_root / "projects" / profile_id
+            if project_parent.exists():
+                projects.update(path.name for path in project_parent.iterdir() if path.is_dir())
+            profiles.append({**profile, "profile_id": profile_id, "projects": sorted(projects)})
+    return {"schema_version": SCHEMA_VERSION, "active_profile": "general", "profiles": profiles, "warnings": [], "blockers": []}
+
+
 def _load_profile_index(repo_root: Path) -> dict[str, Any]:
     from .profiles import build_profile_index
 
-    return _load_json(repo_root / "artifacts" / "v2" / "profiles" / "profile-index.json") or build_profile_index()
+    base = _load_json(repo_root / "artifacts" / "v2" / "profiles" / "profile-index.json") or build_profile_index()
+    overlays = [_profile_index_from_memory_root(root) for root in _memory_root_candidates()]
+    return _merge_profile_indexes(base, overlays)
 
 
 def _load_project_manifest(repo_root: Path, profile_id: str, project_id: str) -> dict[str, Any]:
     from .projects import build_project_manifest
 
-    return _load_json(repo_root / "artifacts" / "v2" / "projects" / profile_id / project_id / "project-manifest.json") or build_project_manifest(profile_id, project_id)
+    memory_project = _memory_project_dir(profile_id, project_id)
+    candidates = [
+        repo_root / "artifacts" / "v2" / "projects" / profile_id / project_id / "project-manifest.json",
+    ]
+    if memory_project:
+        candidates.append(memory_project / "project-manifest.json")
+    for path in candidates:
+        loaded = _load_json(path)
+        if loaded:
+            return loaded
+    return build_project_manifest(profile_id, project_id)
 
 
 def _load_project_summary(repo_root: Path, profile_id: str, project_id: str) -> dict[str, Any] | None:
+    memory_project = _memory_project_dir(profile_id, project_id)
     candidates = [
         repo_root / "docs" / "examples" / "agent-memory-graph" / f"{profile_id}-{project_id}" / "compiled-session-project-scope.json",
         repo_root / "docs" / "examples" / "agent-memory-graph" / project_id / "compiled-session-project-scope.json",
         repo_root / "docs" / "examples" / "agent-memory-graph" / project_id / "compiled-session-project-scope-and-phase-boundary.json",
         repo_root / "artifacts" / "v2" / "projects" / profile_id / project_id / "project-summary.json",
     ]
+    if memory_project:
+        candidates.append(memory_project / "project-summary.json")
     for summary_path in candidates:
         loaded = _load_json(summary_path)
         if loaded:
             return loaded
     return None
+
+
+def _load_project_graph_fragment(profile_id: str, project_id: str) -> dict[str, list[dict[str, Any]]]:
+    memory_project = _memory_project_dir(profile_id, project_id)
+    if not memory_project:
+        return {"nodes": [], "edges": []}
+    fragment = _load_json(memory_project / "graph-fragment.json")
+    if not fragment:
+        return {"nodes": [], "edges": []}
+    nodes: list[dict[str, Any]] = []
+    for raw in fragment.get("nodes", []):
+        if not isinstance(raw, dict) or not raw.get("id"):
+            continue
+        metadata = dict(raw.get("metadata") or {})
+        metadata.setdefault("profile_id", profile_id)
+        metadata.setdefault("project_id", project_id)
+        metadata.setdefault("source", "memory_root_graph_fragment")
+        node = _node(
+            str(raw["id"]),
+            str(raw.get("type") or raw.get("kind") or "knowledge_claim"),
+            str(raw.get("label") or raw["id"]),
+            path=raw.get("path"),
+            summary=str(raw.get("description") or raw.get("summary") or raw.get("label") or raw["id"]),
+            tags=list(raw.get("tags") or []),
+            metadata=metadata,
+        )
+        for key, value in raw.items():
+            if key not in node and key not in {"metadata"}:
+                node[key] = value
+        nodes.append(node)
+    edges: list[dict[str, Any]] = []
+    for raw in fragment.get("edges", []):
+        if not isinstance(raw, dict) or not raw.get("source") or not raw.get("target"):
+            continue
+        relation = raw.get("type") or raw.get("relation") or "references"
+        edge_id = raw.get("id") or f"edge:{_slug(str(raw['source']))}:{_slug(str(relation))}:{_slug(str(raw['target']))}"
+        metadata = dict(raw.get("metadata") or {})
+        metadata.setdefault("profile_id", profile_id)
+        metadata.setdefault("project_id", project_id)
+        metadata.setdefault("source", "memory_root_graph_fragment")
+        edge = _edge(
+            edge_id,
+            str(raw["source"]),
+            str(raw["target"]),
+            str(relation),
+            confidence=float(raw.get("confidence", 0.8)),
+            metadata=metadata,
+        )
+        for key, value in raw.items():
+            if key not in edge and key not in {"metadata"}:
+                edge[key] = value
+        edges.append(edge)
+    return {"nodes": nodes, "edges": edges}
 
 
 def _stringify_summary_item(item: Any) -> str:
@@ -272,6 +406,9 @@ def _profile_project_nodes_and_edges(repo_root: Path) -> tuple[list[dict[str, An
                 for link in summary.get("graph_links", []):
                     if link.get("source") and link.get("target") and link.get("type"):
                         edges.append(_edge(f"edge:project-summary-link:{_slug(link['source'])}:{_slug(link['type'])}:{_slug(link['target'])}", link["source"], link["target"], link["type"], confidence=0.8))
+            fragment = _load_project_graph_fragment(profile_id, project_id)
+            nodes.extend(fragment.get("nodes", []))
+            edges.extend(fragment.get("edges", []))
     return nodes, edges, warnings
 
 
@@ -412,6 +549,24 @@ def _session_nodes_and_edges(repo_root: Path) -> tuple[list[dict[str, Any]], lis
     return nodes, edges, warnings
 
 
+def _dedupe_by_id(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: dict[str, dict[str, Any]] = {}
+    for item in items:
+        item_id = item.get("id")
+        if not item_id:
+            continue
+        if item_id not in deduped:
+            deduped[item_id] = item
+            continue
+        merged = dict(deduped[item_id])
+        existing_metadata = dict(merged.get("metadata") or {})
+        incoming_metadata = dict(item.get("metadata") or {})
+        merged.update({key: value for key, value in item.items() if value not in (None, "", [], {})})
+        merged["metadata"] = {**incoming_metadata, **existing_metadata}
+        deduped[item_id] = merged
+    return list(deduped.values())
+
+
 def build_governance_graph(repo_root: Path | str) -> dict[str, Any]:
     repo_root = Path(repo_root).resolve()
     warnings: list[str] = []
@@ -491,13 +646,18 @@ def build_governance_graph(repo_root: Path | str) -> dict[str, Any]:
     warnings.extend(session_warnings)
     edges.extend(_lineage_map_edges(repo_root, nodes, edges))
 
-    dirtycsv_projection = load_profile_graph_projection("ehrlab", "dirtycsv")
-    nodes.extend(dirtycsv_projection.get("nodes", []))
-    edges.extend(dirtycsv_projection.get("edges", []))
-    warnings.extend(dirtycsv_projection.get("warnings", []))
+    for profile in _load_profile_index(repo_root).get("profiles", []):
+        profile_id = profile.get("profile_id")
+        for project_id in profile.get("projects", []):
+            if not profile_id or not project_id:
+                continue
+            projection = load_profile_graph_projection(profile_id, project_id)
+            nodes.extend(projection.get("nodes", []))
+            edges.extend(projection.get("edges", []))
+            warnings.extend(projection.get("warnings", []))
 
-    nodes = sorted(nodes, key=lambda item: item["id"])
-    edges = sorted(edges, key=lambda item: item["id"])
+    nodes = sorted(_dedupe_by_id(nodes), key=lambda item: item["id"])
+    edges = sorted(_dedupe_by_id(edges), key=lambda item: item["id"])
     node_types = {node["type"] for node in nodes}
     edge_types = {edge["type"] for edge in edges}
 
