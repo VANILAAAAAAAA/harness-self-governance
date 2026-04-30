@@ -11,6 +11,7 @@ from agent_memory_graph.artifacts import build_context_router_artifacts
 from agent_memory_graph.bootstrap import bootstrap_repo as bootstrap_agent_graph_repo
 from agent_memory_graph.export import export_repo_projection
 from agent_memory_graph.maintenance import generate_archive_maintenance_proposal, write_archive_maintenance_report
+from agent_memory_graph.pending_lifecycle import compile_pending_updates
 
 from .graph_export import write_governance_graph
 from .lineage_index import write_lineage_index
@@ -466,6 +467,8 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
     archive_maintenance_path = maintenance_root / "archive-maintenance-report.json"
     archive_proposal_path = maintenance_root / "archive-maintenance-proposal.json"
     archive_trigger_path = maintenance_root / "archive-trigger-report.json"
+    pending_compilation_path = maintenance_root / "pending-update-compilation-report.json"
+    runtime_traces_path = repo_root / "artifacts" / "v2" / "runtime" / "graph-memory-traces.json"
     if not profile_index_path.exists():
         write_profile_index(repo_root)
     if not project_manifest_path.exists():
@@ -474,10 +477,11 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         write_governance_graph(repo_root, governance_graph_path)
     if not lineage_path.exists():
         write_lineage_index(repo_root)
-    if not all(path.exists() for path in (context_index_path, router_samples_path, context_packets_path, context_gaps_path, pending_updates_path, archive_gate_path, archive_maintenance_path, archive_proposal_path, archive_trigger_path)):
+    if not all(path.exists() for path in (context_index_path, router_samples_path, context_packets_path, context_gaps_path, pending_updates_path, archive_gate_path, archive_maintenance_path, archive_proposal_path, archive_trigger_path, pending_compilation_path)):
         with TemporaryDirectory(prefix="agent-memory-graph-dashboard-") as temp_memory_root:
             bootstrap_agent_graph_repo(repo_root, temp_memory_root, context_budget="fast")
             _archive_curated_examples_for_dashboard(repo_root, temp_memory_root)
+            compile_pending_updates(repo_root, temp_memory_root)
             export_repo_projection(repo_root, temp_memory_root)
             build_context_router_artifacts(repo_root, temp_memory_root, context_root)
             write_archive_maintenance_report(repo_root, temp_memory_root)
@@ -535,6 +539,23 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         "recommendation_count": 0,
         "latest_recommendations": [],
     }
+    pending_compilation = _load_json(pending_compilation_path) or {
+        "compiled_count": 0,
+        "total_candidate_count": 0,
+        "non_destructive": True,
+        "archive_gate_required": True,
+        "auto_archive_allowed": False,
+    }
+    runtime_traces = _load_json(runtime_traces_path) or {
+        "available": False,
+        "event_count": 0,
+        "pre_llm_call_count": 0,
+        "injected_count": 0,
+        "error_count": 0,
+        "raw_sessions_allowed_count": 0,
+        "warnings": ["runtime traces not exported; run agent-graph runtime-traces export"],
+        "blockers": [],
+    }
     packet_samples = context_packets.get("samples", [])
     context_router = {
         "available": bool(context_index and context_packets),
@@ -585,12 +606,26 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         "maintenance_proposal": archive_proposal,
         "archive_gate": archive_gate,
         "archive_trigger_report": archive_trigger,
+        "pending_update_compilation_report": pending_compilation,
+    }
+    runtime_observability = {
+        "available": bool(runtime_traces.get("available")),
+        "trace_report_path": "artifacts/v2/runtime/graph-memory-traces.json",
+        "event_count": runtime_traces.get("event_count", 0),
+        "pre_llm_call_count": runtime_traces.get("pre_llm_call_count", 0),
+        "injected_count": runtime_traces.get("injected_count", 0),
+        "error_count": runtime_traces.get("error_count", 0),
+        "raw_sessions_allowed_count": runtime_traces.get("raw_sessions_allowed_count", 0),
+        "latest": runtime_traces.get("latest"),
+        "skill_counts": runtime_traces.get("skill_counts", {}),
+        "trace_report": runtime_traces,
     }
     return {
         "schema_version": "2.0",
         "app": {"name": "Governance Hub", "version": "v2.0", "default_route": "#/graph"},
         "context_router": context_router,
         "archive_lifecycle": archive_lifecycle,
+        "runtime_observability": runtime_observability,
         "graph": governance_graph,
         "graph_summary": graph_summary,
         "graphs": graphs,
@@ -608,6 +643,7 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
             "archive_gate_available": True,
             "archive_maintenance_available": True,
             "live_session_boundary_supported": True,
+            "runtime_observability_available": runtime_observability["available"],
             **safety,
             **archive_lifecycle,
             **(pipeline or {"status": "PASS"}),
@@ -644,6 +680,7 @@ def _html(data: dict[str, Any]) -> str:
         for sample in data.get("context_router", {}).get("sample_queries", [])
     )
     archive = data.get("archive_lifecycle", {})
+    runtime = data.get("runtime_observability", {})
     archive_summary = "".join(
         [
             '<span class="archive-chip">trigger policy: active</span>',
@@ -657,6 +694,9 @@ def _html(data: dict[str, Any]) -> str:
             f'<span class="archive-chip">stale summaries: {archive.get("stale_summaries_count", 0)}</span>',
             f'<span class="archive-chip">archive quality: {archive.get("archive_quality", "unknown")}</span>',
             '<span class="archive-chip">raw sessions: forensic only</span>',
+            f'<span class="archive-chip">runtime traces: {"available" if runtime.get("available") else "not exported"}</span>',
+            f'<span class="archive-chip">runtime injected: {runtime.get("injected_count", 0)}</span>',
+            f'<span class="archive-chip">runtime errors: {runtime.get("error_count", 0)}</span>',
         ]
     )
     project_cards = "".join(

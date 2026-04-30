@@ -14,6 +14,7 @@ from agent_memory_graph.maintenance import (
     write_archive_maintenance_report,
 )
 from agent_memory_graph.pending_updates import capture_pending_update
+from agent_memory_graph.pending_lifecycle import compile_pending_updates
 from agent_memory_graph.repo_adapter import init_repo_manifest
 
 ROOT = Path(__file__).parents[1]
@@ -68,13 +69,21 @@ def test_archive_gate_and_maintenance_reports_are_generated_without_mutation(tmp
     bootstrap_repo(repo, memory_root)
     _archive_examples(memory_root, repo)
     capture_pending_update(repo, "Need stale summary review for context router docs.", "general", "harness-self-governance", memory_root)
+    compile_report = compile_pending_updates(repo, memory_root)
+    assert compile_report["status"] == "PASS"
+    assert compile_report["compiled_count"] == 1
+    compiled_payload = json.loads((memory_root / "routing" / "compiled-candidates.json").read_text(encoding="utf-8"))
+    assert compiled_payload["candidates"][0]["lifecycle_state"] == "compiled_candidate"
+    assert compiled_payload["candidates"][0]["review_required"] is True
+    assert compiled_payload["candidates"][0]["auto_archive_allowed"] is False
 
     gate_report = write_archive_gate_report(repo, memory_root)
     assert gate_report["status"] == "PASS"
     assert gate_report["report_path"].endswith("reports/archive-gate-report.json")
     gate_payload = json.loads((memory_root / "reports" / "archive-gate-report.json").read_text(encoding="utf-8"))
-    assert gate_payload["counts"]["compiled_candidate"] >= 7
+    assert gate_payload["counts"]["compiled_candidate"] >= 8
     assert gate_payload["counts"]["pending_update"] >= 1
+    assert any(item.get("source_update_id") for item in gate_payload["items"] if item["classification"] == "compiled_candidate")
     assert gate_payload["raw_sessions_required"] is False
 
     before_export = json.loads((memory_root / "projects" / "general" / "harness-self-governance" / "session-index.json").read_text(encoding="utf-8"))

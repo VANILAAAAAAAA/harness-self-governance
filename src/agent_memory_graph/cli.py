@@ -13,8 +13,10 @@ from .context_index import build_context_index
 from .export import export_repo_projection
 from .maintenance import generate_archive_maintenance_proposal, validate_archive_maintenance, write_archive_maintenance_report
 from .pending_updates import capture_pending_update
+from .pending_lifecycle import compile_pending_updates
 from .repo_adapter import init_repo_manifest
 from .retrieve import retrieve_project_context
+from .runtime_traces import export_graph_memory_traces
 from .router import route_query
 from .traversal import traverse_memory_graph
 from .schemas import resolve_memory_root
@@ -96,6 +98,18 @@ def build_parser() -> argparse.ArgumentParser:
     archive_gate_report = archive_gate_sub.add_parser("report", help="Write archive gate lifecycle report")
     archive_gate_report.add_argument("--repo", default=".")
     archive_gate_report.add_argument("--memory-root", default=None)
+    archive_gate_compile = archive_gate_sub.add_parser("compile-pending", help="Materialize pending updates as reviewed compiled candidates without archiving")
+    archive_gate_compile.add_argument("--repo", default=".")
+    archive_gate_compile.add_argument("--memory-root", default=None)
+    archive_gate_compile.add_argument("--profile", default=None)
+    archive_gate_compile.add_argument("--project", default=None)
+
+    traces = sub.add_parser("runtime-traces", help="Export Hermes graph-memory runtime trace observability")
+    traces_sub = traces.add_subparsers(dest="traces_command", required=True)
+    traces_export = traces_sub.add_parser("export", help="Export bounded graph-memory JSONL traces into a report artifact")
+    traces_export.add_argument("--trace-dir", required=True)
+    traces_export.add_argument("--out", required=True)
+    traces_export.add_argument("--limit", type=int, default=50)
 
     maintenance = sub.add_parser("maintenance", help="Archive lifecycle maintenance reporting and proposal commands")
     maintenance_sub = maintenance.add_subparsers(dest="maintenance_command", required=True)
@@ -189,6 +203,15 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if report["status"] == "PASS" else 1
         if args.archive_gate_command == "report":
             report = write_archive_gate_report(Path(args.repo), args.memory_root)
+            _print(report)
+            return 0 if report["status"] == "PASS" else 1
+        if args.archive_gate_command == "compile-pending":
+            report = compile_pending_updates(Path(args.repo), args.memory_root, profile=args.profile, project=args.project)
+            _print(report)
+            return 0 if report["status"] == "PASS" else 1
+    if args.command == "runtime-traces":
+        if args.traces_command == "export":
+            report = export_graph_memory_traces(args.trace_dir, args.out, limit=args.limit)
             _print(report)
             return 0 if report["status"] == "PASS" else 1
     if args.command == "maintenance":

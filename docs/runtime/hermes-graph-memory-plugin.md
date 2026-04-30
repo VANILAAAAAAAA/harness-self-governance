@@ -28,6 +28,16 @@ incoming user turn
 
 ## Config
 
+Install as an independent project extension from this repository, not as an upstream `hermes-agent` fork:
+
+```bash
+cd /home/vanila/code/graph-harness-maintain
+./adapters/hermes/install.sh /home/vanila/.hermes/profiles/general
+./adapters/hermes/verify.sh /home/vanila/.hermes/profiles/general
+```
+
+The adapter manifest is versioned at `adapters/hermes/adapter.yaml`; installed copies go under the target profile's `plugins/` directory.
+
 ```yaml
 plugins:
   enabled:
@@ -92,6 +102,36 @@ Each turn appends JSONL under `trace_dir`:
   "injected": true
 }
 ```
+
+Export bounded trace observability into the read-only dashboard artifact set:
+
+```bash
+.venv/bin/python -m agent_memory_graph runtime-traces export \
+  --trace-dir /home/vanila/.hermes/profiles/general/graph-memory-traces \
+  --out artifacts/v2/runtime/graph-memory-traces.json \
+  --limit 50
+```
+
+The dashboard treats this as readonly audit evidence. Missing trace export is a warning, not a runtime blocker.
+
+## Archive lifecycle
+
+New facts are not directly archived. The controlled lifecycle is:
+
+```text
+live turn -> pending_update -> compiled_candidate -> archive_gate -> compiled_memory
+```
+
+Materialize pending updates as review-only candidates:
+
+```bash
+.venv/bin/python -m agent_memory_graph archive-gate compile-pending \
+  --repo . \
+  --profile general \
+  --project harness-self-governance
+```
+
+This is non-destructive: pending updates remain in place, candidates require review, and auto archive remains disabled.
 
 ## Rollback
 

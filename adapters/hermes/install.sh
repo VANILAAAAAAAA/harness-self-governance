@@ -8,6 +8,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_SRC="$SCRIPT_DIR/plugins/graph-memory"
+ADAPTER_MANIFEST="$SCRIPT_DIR/adapter.yaml"
 
 TARGET_HOME="${1:-${HERMES_HOME:-$HOME/.hermes}}"
 PLUGIN_DST="$TARGET_HOME/plugins/graph-memory"
@@ -21,11 +22,18 @@ fi
 mkdir -p "$PLUGIN_DST"
 cp "$PLUGIN_SRC/plugin.yaml" "$PLUGIN_DST/plugin.yaml"
 cp "$PLUGIN_SRC/__init__.py" "$PLUGIN_DST/__init__.py"
+if [[ -f "$ADAPTER_MANIFEST" ]]; then
+  cp "$ADAPTER_MANIFEST" "$TARGET_HOME/plugins/graph-memory-adapter.yaml"
+fi
 
 cat <<EOF
 Installed graph-memory plugin:
   source: $PLUGIN_SRC
   target: $PLUGIN_DST
+  manifest: $TARGET_HOME/plugins/graph-memory-adapter.yaml
+
+Verify:
+  $SCRIPT_DIR/verify.sh $TARGET_HOME
 
 Next, enable in config:
   config: $CONFIG_PATH

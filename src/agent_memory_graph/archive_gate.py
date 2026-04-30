@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from .archive_quality import compiled_session_example_dir, iter_compiled_session_examples
+from .pending_lifecycle import list_compiled_candidates
 from .repo_adapter import read_repo_manifest
 from .schemas import SCHEMA_VERSION, deterministic_write_json, read_json, resolve_memory_root, validate_compiled_session
 
@@ -108,6 +109,22 @@ def _pending_update_items(memory_root: Path) -> list[dict[str, Any]]:
 
 
 def _compiled_candidate_items(repo_root: Path, memory_root: Path, profile_id: str, project_id: str) -> list[dict[str, Any]]:
+    lifecycle_items = []
+    for candidate in list_compiled_candidates(memory_root):
+        if candidate.get("profile") != profile_id or candidate.get("project") != project_id:
+            continue
+        lifecycle_items.append(
+            {
+                "id": candidate.get("id"),
+                "classification": "compiled_candidate",
+                "path": "<memory-root>/routing/compiled-candidates.json",
+                "archive_allowed": False,
+                "review_required": True,
+                "auto_archive_allowed": False,
+                "summary": str(candidate.get("text", ""))[:160],
+                "source_update_id": candidate.get("source_update_id"),
+            }
+        )
     items = []
     for path in iter_compiled_session_examples(compiled_session_example_dir(repo_root)):
         payload = read_json(path)
@@ -122,7 +139,7 @@ def _compiled_candidate_items(repo_root: Path, memory_root: Path, profile_id: st
             }
         )
     if items:
-        return items
+        return lifecycle_items + items
     session_index = read_json(
         memory_root / "projects" / profile_id / project_id / "session-index.json",
         default={"sessions": []},
@@ -138,7 +155,7 @@ def _compiled_candidate_items(repo_root: Path, memory_root: Path, profile_id: st
                 "summary": str(session.get("summary", ""))[:160],
             }
         )
-    return items
+    return lifecycle_items + items
 
 
 def _forensic_only_items(repo_root: Path) -> list[dict[str, Any]]:

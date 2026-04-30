@@ -1,0 +1,29 @@
+name: graph-memory-hermes-adapter
+version: 0.2.0
+kind: hermes-profile-plugin
+owner_repo: graph-harness-maintain
+upstream_hermes_modified: false
+plugin:
+  name: graph-memory
+  source: adapters/hermes/plugins/graph-memory
+  install_target: <HERMES_PROFILE_HOME>/plugins/graph-memory
+hooks:
+  - pre_llm_call
+  - post_llm_call
+runtime_contract:
+  mode: inject
+  default_budget: fast
+  default_evidence_depth: anchor
+  raw_span_enabled_default: false
+  historical_raw_sessions_default_read: false
+  current_live_session_raw_context: preserved_by_hermes
+observability:
+  trace_jsonl: <HERMES_PROFILE_HOME>/graph-memory-traces/*.jsonl
+  export_command: agent-graph runtime-traces export
+  dashboard_artifact: artifacts/v2/runtime/graph-memory-traces.json
+skill_mounts:
+  supported: true
+  default_mode: summary
+rollback:
+  remove_plugin_dir: <HERMES_PROFILE_HOME>/plugins/graph-memory
+  restore_config_from_backup: <HERMES_PROFILE_HOME>/config.yaml.bak-*

@@ -212,6 +212,7 @@ def export_repo_projection(repo_root: Path | str, memory_root: Path | str) -> di
         'archive-maintenance-report.json',
         'archive-maintenance-proposal.json',
         'archive-trigger-report.json',
+        'pending-update-compilation-report.json',
     ):
         source = memory_root / 'reports' / name
         if source.exists():

@@ -114,6 +114,10 @@ def test_dashboard_file_generated_as_two_page_graph_logs_app() -> None:
         "Entry nodes",
         "Selected artifacts",
         "raw_sessions_allowed",
+        "runtime traces:",
+        "runtime injected:",
+        "runtime errors:",
+        "runtime_observability",
         "requires_llm_gate",
         "Context packet",
         "graph_summary",
@@ -268,6 +272,10 @@ def test_dashboard_embeds_graph_logs_sessions_and_safety_data() -> None:
     assert samples["log定位"]["matched_topics"] or samples["log定位"]["matched_aliases"]
     assert router["context_gaps"]["count"] == len(router["context_gaps"]["gaps"])
     assert router["pending_updates"]["count"] == len(router["pending_updates"]["items"])
+    assert data["archive_lifecycle"]["pending_update_compilation_report"]["non_destructive"] is True
+    assert "runtime_observability" in data
+    assert data["runtime_observability"]["trace_report_path"].endswith("graph-memory-traces.json")
+    assert data["runtime_observability"]["raw_sessions_allowed_count"] == 0
 
 
 def test_collect_file_inventory_handles_missing_dirs_and_previews_json(tmp_path: Path) -> None:
