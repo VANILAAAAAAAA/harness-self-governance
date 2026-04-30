@@ -73,6 +73,6 @@ def test_graph_export_expands_local_capability_inventory() -> None:
     assert any(node["id"].startswith("knowledge:test:") for node in nodes)
     assert any(node["id"].startswith("knowledge:doc:") for node in nodes)
     assert any(node["id"].startswith("knowledge:policy:") for node in nodes)
-    assert any(node["type"] == "tool" and "skill" in node["tags"] for node in nodes)
+    assert any(node["type"] == "skill" and "skill" in node["tags"] for node in nodes)
     assert any(edge["type"] == "uses_tool" and edge["target"].startswith("tool:cli:") for edge in edges)
     assert any(edge["type"] == "references" and edge["target"].startswith("knowledge:doc:") for edge in edges)

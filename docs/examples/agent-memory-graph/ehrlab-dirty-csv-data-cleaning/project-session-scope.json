@@ -1,0 +1,4 @@
+{
+  "superseded_by": "docs/examples/agent-memory-graph/ehrlab-dirtycsv",
+  "reason": "dirtycsv is now canonical standalone project id for dashboard/manageability."
+}

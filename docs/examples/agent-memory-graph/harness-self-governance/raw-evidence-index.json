@@ -1,0 +1,80 @@
+{
+  "anchors": [
+    {
+      "anchor_id": "raw_anchor:general:harness-self-governance:current-live-session-policy",
+      "claim_ids": [
+        "decision:current-live-session-raw-preserved",
+        "constraint:historical-raw-sessions-forensic-only"
+      ],
+      "message_range": [
+        132,
+        137
+      ],
+      "profile": "general",
+      "project": "harness-self-governance",
+      "raw_path": "sessions/raw/20260429-current-live-session-policy.jsonl",
+      "read_policy": "evidence_deepening_only",
+      "safe_excerpt": "User clarified that Hermes must preserve the current live session raw message stream as short-term context; only historical raw sessions are forbidden by default and reserved for explicit forensic/discovery reads.",
+      "sensitivity": "internal",
+      "source_session_id": "20260429-current-live-session-policy",
+      "span_type": "decision",
+      "tags": [
+        "current-session-raw",
+        "historical-raw-policy",
+        "retriever-contract"
+      ]
+    },
+    {
+      "anchor_id": "raw_anchor:general:harness-self-governance:focus-hub-scoped-fallback",
+      "claim_ids": [
+        "fix:dashboard-focus-hub-scoped-fallback",
+        "cause:global-hub-outside-project-scope"
+      ],
+      "message_range": [
+        165,
+        182
+      ],
+      "profile": "general",
+      "project": "harness-self-governance",
+      "raw_path": "sessions/raw/20260429-focus-hub-fix.jsonl",
+      "read_policy": "evidence_deepening_only",
+      "safe_excerpt": "Focus Hub disappeared because it used a global or stale hub outside the current profile/project scope. The fix introduced scopedHubId(), scope-change reset, and selectHub scope guards; browser validation showed focus · 11 nodes · 17 edges with no JS errors.",
+      "sensitivity": "internal",
+      "source_session_id": "20260429-focus-hub-fix",
+      "span_type": "implementation",
+      "tags": [
+        "dashboard",
+        "focus-hub",
+        "scoped-hub",
+        "browser-validation"
+      ]
+    },
+    {
+      "anchor_id": "raw_anchor:general:harness-self-governance:stage3-evidence-anchor-performance",
+      "claim_ids": [
+        "requirement:selective-raw-rehydration",
+        "decision:cache-first-retrieval"
+      ],
+      "message_range": [
+        1,
+        1
+      ],
+      "profile": "general",
+      "project": "harness-self-governance",
+      "raw_path": "sessions/raw/20260429-stage3-evidence-anchor-performance.jsonl",
+      "read_policy": "evidence_deepening_only",
+      "safe_excerpt": "User requested execution of raw evidence anchor and on-demand reading, plus latency optimization so Hermes can retrieve compiled graph memory efficiently without repeatedly recompiling or rereading raw sessions.",
+      "sensitivity": "internal",
+      "source_session_id": "20260429-stage3-evidence-anchor-performance",
+      "span_type": "requirement",
+      "tags": [
+        "raw-evidence-anchor",
+        "selective-rehydration",
+        "latency",
+        "cache"
+      ]
+    }
+  ],
+  "index_type": "raw_evidence_anchor_index",
+  "schema_version": "2.0"
+}

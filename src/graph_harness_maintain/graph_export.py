@@ -11,6 +11,7 @@ REQUIRED_NODE_TYPES = {
     "profile",
     "project",
     "project_summary",
+    "plan",
     "pipeline_run",
     "artifact",
     "report",
@@ -19,6 +20,7 @@ REQUIRED_NODE_TYPES = {
     "policy",
     "adapter",
     "tool",
+    "skill",
     "knowledge_source",
     "session",
     "decision",
@@ -46,6 +48,7 @@ REQUIRED_EDGE_TYPES = {
     "requires",
     "uses_tool",
     "summarized_into",
+    "planned_by",
 }
 
 
@@ -136,7 +139,51 @@ def _load_project_manifest(repo_root: Path, profile_id: str, project_id: str) ->
 
 
 def _load_project_summary(repo_root: Path, profile_id: str, project_id: str) -> dict[str, Any] | None:
-    return _load_json(repo_root / "artifacts" / "v2" / "projects" / profile_id / project_id / "project-summary.json")
+    candidates = [
+        repo_root / "docs" / "examples" / "agent-memory-graph" / f"{profile_id}-{project_id}" / "compiled-session-project-scope.json",
+        repo_root / "docs" / "examples" / "agent-memory-graph" / project_id / "compiled-session-project-scope.json",
+        repo_root / "docs" / "examples" / "agent-memory-graph" / project_id / "compiled-session-project-scope-and-phase-boundary.json",
+        repo_root / "artifacts" / "v2" / "projects" / profile_id / project_id / "project-summary.json",
+    ]
+    for summary_path in candidates:
+        loaded = _load_json(summary_path)
+        if loaded:
+            return loaded
+    return None
+
+
+def _stringify_summary_item(item: Any) -> str:
+    if isinstance(item, dict):
+        return str(item.get("text") or item.get("meaning") or item.get("phase") or item.get("name") or item.get("id") or item)
+    return str(item)
+
+
+def _summary_description(summary: dict[str, Any], fallback: str) -> str:
+    if not summary:
+        return fallback
+    sections: list[str] = []
+    for key, label in (
+        ("summary", "Summary"),
+        ("project_goal", "Goal"),
+        ("project_status", "Status"),
+        ("purpose", "Purpose"),
+    ):
+        if summary.get(key):
+            prefix = "" if key == "summary" else f"{label}: "
+            sections.append(prefix + str(summary[key]))
+    for key, label in (
+        ("current_problems", "Problems"),
+        ("phase_boundaries", "Phase boundaries"),
+        ("key_decisions", "Key decisions"),
+        ("requirements", "Requirements"),
+        ("constraints", "Constraints"),
+        ("read_order", "Read order"),
+        ("cautions", "Cautions"),
+    ):
+        values = [_stringify_summary_item(item) for item in summary.get(key, []) if item]
+        if values:
+            sections.append(f"{label}: " + " ".join(f"- {item}" for item in values[:5]))
+    return "\n".join(sections) or fallback
 
 
 def _profile_project_nodes_and_edges(repo_root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
@@ -181,8 +228,8 @@ def _profile_project_nodes_and_edges(repo_root: Path) -> tuple[list[dict[str, An
                     f"{manifest.get('title') or project_id} summary",
                     path=manifest.get("summary_path"),
                     privacy="local_only",
-                    summary=(summary or {}).get("summary") or "Project summary is populated by agent-triggered archive artifacts.",
-                    metadata={"profile_id": profile_id, "project_id": project_id, "archive_contract": "agent_triggered"},
+                    summary=_summary_description(summary or {}, "Project summary is populated by agent-triggered archive artifacts."),
+                    metadata={"profile_id": profile_id, "project_id": project_id, "archive_contract": "agent_triggered", "summary_sections": {"project_goal": (summary or {}).get("project_goal"), "project_status": (summary or {}).get("project_status"), "current_problems": (summary or {}).get("current_problems", []), "phase_boundaries": (summary or {}).get("phase_boundaries", []), "key_decisions": (summary or {}).get("key_decisions", []), "purpose": (summary or {}).get("purpose"), "actions": (summary or {}).get("actions", []), "results": (summary or {}).get("results", []), "requirements": (summary or {}).get("requirements", []), "constraints": (summary or {}).get("constraints", []), "cautions": (summary or {}).get("cautions", []), "evidence_paths": (summary or {}).get("evidence_paths", []), "read_order": (summary or {}).get("read_order", []), "memory_lifecycle": (summary or {}).get("memory_lifecycle", {}), "project_plan": (summary or {}).get("project_plan", {}), "key_skills": (summary or {}).get("key_skills", []), "key_tools": (summary or {}).get("key_tools", [])}},
                 )
             )
             edges.append(_edge(f"edge:profile:{profile_id}:owns-project:{project_id}", profile_node, project_node, "owns_project"))
@@ -201,6 +248,25 @@ def _profile_project_nodes_and_edges(repo_root: Path) -> tuple[list[dict[str, An
                     node_id = constraint.get("id") or f"constraint:{_slug(constraint.get('text', project_id))}"
                     nodes.append(_node(node_id, "constraint", constraint.get("text", node_id)[:80], summary=constraint.get("text", node_id), metadata={"profile_id": profile_id, "project_id": project_id, "source": constraint.get("source")}))
                     edges.append(_edge(f"edge:{summary_node}:constrains:{node_id}", summary_node, node_id, "constrains"))
+                plan = summary.get("project_plan") or {}
+                if plan:
+                    plan_id = plan.get("id") or f"plan:{profile_id}:{project_id}"
+                    completed = plan.get("completed", []) or []
+                    todo = plan.get("todo", []) or []
+                    plan_summary = f"Agent-readable project plan: {len(completed)} completed, {len(todo)} todo. Status: {plan.get('status', 'active')}"
+                    nodes.append(_node(plan_id, "plan", f"{manifest.get('title') or project_id} plan", summary=plan_summary, tags=["plan", "agent-readable"], metadata={"profile_id": profile_id, "project_id": project_id, "completed": completed, "todo": todo, "status": plan.get("status"), "source": plan.get("source")}))
+                    edges.append(_edge(f"edge:project:{profile_id}:{project_id}:planned-by", project_node, plan_id, "planned_by", confidence=0.95))
+                    edges.append(_edge(f"edge:{summary_node}:summarizes-plan", summary_node, plan_id, "summarizes", confidence=0.9))
+                for skill in summary.get("key_skills", []):
+                    skill_id = skill.get("id") or f"skill:{_slug(skill.get('name', project_id))}"
+                    nodes.append(_node(skill_id, "skill", skill.get("name", skill_id), summary=skill.get("role", skill.get("name", skill_id)), tags=["skill", "capability"], metadata={"profile_id": profile_id, "project_id": project_id, "role": skill.get("role")}))
+                    edges.append(_edge(f"edge:project:{profile_id}:{project_id}:uses-skill:{_slug(skill_id)}", project_node, skill_id, "uses_tool", confidence=0.85))
+                    edges.append(_edge(f"edge:{summary_node}:summarizes-skill:{_slug(skill_id)}", summary_node, skill_id, "summarizes", confidence=0.7))
+                for tool in summary.get("key_tools", []):
+                    tool_id = tool.get("id") or f"tool:{_slug(tool.get('name', project_id))}"
+                    nodes.append(_node(tool_id, "tool", tool.get("name", tool_id), summary=tool.get("role", tool.get("name", tool_id)), tags=["tool", "capability"], metadata={"profile_id": profile_id, "project_id": project_id, "role": tool.get("role")}))
+                    edges.append(_edge(f"edge:project:{profile_id}:{project_id}:uses-tool:{_slug(tool_id)}", project_node, tool_id, "uses_tool", confidence=0.85))
+                    edges.append(_edge(f"edge:{summary_node}:summarizes-tool:{_slug(tool_id)}", summary_node, tool_id, "summarizes", confidence=0.7))
                 for link in summary.get("graph_links", []):
                     if link.get("source") and link.get("target") and link.get("type"):
                         edges.append(_edge(f"edge:project-summary-link:{_slug(link['source'])}:{_slug(link['type'])}:{_slug(link['target'])}", link["source"], link["target"], link["type"], confidence=0.8))
@@ -276,12 +342,12 @@ def _capability_nodes_and_edges(repo_root: Path) -> tuple[list[dict[str, Any]], 
             nodes.append(_node(policy_id, "knowledge_source", path.stem, path=rel, summary=f"Policy source file: {rel}", tags=["policy", "safety"]))
             edges.append(_edge(f"edge:policy-boundary-references-{_slug(path.stem)}", "policy:safety-boundary", policy_id, "references", confidence=0.8))
 
-    skill_names = ["graph-harness-maintain", "test-driven-development", "writing-plans"]
+    skill_names = ["graph-harness-maintain", "frontend-visual-qa", "systematic-debugging", "test-driven-development", "writing-plans", "subagent-driven-development"]
     for name in skill_names:
-        skill_id = f"tool:skill:{_slug(name)}"
-        nodes.append(_node(skill_id, "tool", f"skill {name}", summary=f"Agent procedural skill relevant to v2 graph/log dashboard iteration: {name}", tags=["skill", "tool", "procedure"], metadata={"skill": name}))
-        edges.append(_edge(f"edge:v2-uses-skill-{_slug(name)}", "pipeline:v2.0-rc", skill_id, "uses_tool", confidence=0.65))
-        edges.append(_edge(f"edge:skill-{_slug(name)}-governed-by-policy", skill_id, "policy:safety-boundary", "governed_by", confidence=0.65))
+        skill_id = f"skill:{_slug(name)}"
+        nodes.append(_node(skill_id, "skill", f"skill {name}", summary=f"Agent procedural skill governed as part of the project capability graph: {name}", tags=["skill", "procedure", "governance-capability"], metadata={"skill": name, "profile_id": "general", "project_id": "harness-self-governance"}))
+        edges.append(_edge(f"edge:v2-uses-skill-{_slug(name)}", "pipeline:v2.0-rc", skill_id, "uses_tool", confidence=0.75))
+        edges.append(_edge(f"edge:skill-{_slug(name)}-governed-by-policy", skill_id, "policy:safety-boundary", "governed_by", confidence=0.75))
 
     return nodes, edges
 

@@ -1,0 +1,53 @@
+{
+  "schema_version": "2.0",
+  "profile_id": "general",
+  "project_id": "harness-self-governance",
+  "session_id": "session:ehrlab-export-sanitized-boundary",
+  "privacy": "local_only",
+  "summary": "The imported ehrlab seed preserves the cross-profile governance boundary: ehrlab exports sanitized capability/health summaries to general, while general governs via proposals rather than raw cross-profile access.",
+  "decisions": [
+    {
+      "id": "decision:ehrlab-sanitized-export-only",
+      "source": "session:ehrlab-export-sanitized-boundary",
+      "status": "accepted",
+      "text": "ehrlab participates in harness governance through sanitized exports rather than raw graph or sensitive data sharing."
+    },
+    {
+      "id": "decision:general-governance-audit-proposal-only",
+      "source": "session:ehrlab-export-sanitized-boundary",
+      "status": "accepted",
+      "text": "general reads sanitized exports and produces governance proposals; it does not directly mutate ehrlab local graph state."
+    }
+  ],
+  "requirements": [
+    {
+      "id": "requirement:ehrlab-export-summary-artifacts",
+      "source": "session:ehrlab-export-sanitized-boundary",
+      "text": "ehrlab must emit sanitized capability summary and graph health report artifacts for governance consumption."
+    }
+  ],
+  "constraints": [
+    {
+      "id": "constraint:no-cross-profile-raw-leakage",
+      "source": "session:ehrlab-export-sanitized-boundary",
+      "text": "Raw EHR, patient-level data, credentials, and sensitive schema cannot be exported from ehrlab into general."
+    }
+  ],
+  "graph_links": [
+    {
+      "source": "decision:ehrlab-sanitized-export-only",
+      "target": "requirement:ehrlab-export-summary-artifacts",
+      "type": "supports"
+    },
+    {
+      "source": "decision:general-governance-audit-proposal-only",
+      "target": "constraint:no-cross-profile-raw-leakage",
+      "type": "constrains"
+    },
+    {
+      "source": "decision:ehrlab-sanitized-export-only",
+      "target": "protocol:graph-governed-context",
+      "type": "supports"
+    }
+  ]
+}

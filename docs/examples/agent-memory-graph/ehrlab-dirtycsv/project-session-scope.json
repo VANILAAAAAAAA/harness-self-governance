@@ -1,0 +1,96 @@
+{
+  "schema_version": "1.0",
+  "project_id": "dirtycsv",
+  "profile_id": "ehrlab",
+  "compiled_at": "2026-04-28",
+  "scope_rules": {
+    "ehrlab": "Include all ehrlab sessions except 20260426_171423_4714c0; those sessions are the dirtycsv project corpus.",
+    "general": "Exclude general sessions; they belong to harness-self-governance.",
+    "default": "Exclude default/root sessions."
+  },
+  "counts": {
+    "ehrlab_included": 19,
+    "ehrlab_excluded": 1,
+    "general_excluded": 78,
+    "default_excluded": 22
+  },
+  "included_sessions": {
+    "ehrlab": [
+      "20260426_170413_da389f",
+      "20260426_181644_0ec501",
+      "20260426_182237_2bd2f1",
+      "20260426_182842_c2b897",
+      "20260426_183356_76a218",
+      "20260426_184117_33e472",
+      "20260426_185229_708df0",
+      "20260426_185559_e1f141",
+      "20260426_190252_b36f9b",
+      "20260426_190527_cd299e",
+      "20260426_194609_4d8264",
+      "20260426_195101_1d4d52",
+      "20260426_200723_dcef95",
+      "20260426_201328_521769",
+      "20260426_203241_96b661",
+      "20260426_203828_fb75ec",
+      "9eefdf31f48f",
+      "e0fc332a6ace",
+      "eb67e7146c70"
+    ],
+    "general": [],
+    "default": []
+  },
+  "excluded_sessions": {
+    "ehrlab": [
+      "20260426_171423_4714c0"
+    ],
+    "general": [],
+    "default": []
+  },
+  "phase_boundaries": [
+    {
+      "phase_id": "dirtycsv-bootstrap-and-safety",
+      "range": "2026-04-26",
+      "sessions": [
+        "20260426_170413_da389f",
+        "20260426_181644_0ec501",
+        "20260426_182237_2bd2f1",
+        "20260426_182842_c2b897",
+        "20260426_183356_76a218",
+        "20260426_184117_33e472",
+        "20260426_185229_708df0"
+      ],
+      "purpose": "Prepare safe ehrlab-local control surface."
+    },
+    {
+      "phase_id": "dirtycsv-adapter-and-hardening",
+      "range": "2026-04-26",
+      "sessions": [
+        "20260426_185559_e1f141",
+        "20260426_190252_b36f9b",
+        "20260426_190527_cd299e",
+        "20260426_194609_4d8264",
+        "20260426_195101_1d4d52",
+        "20260426_200723_dcef95",
+        "20260426_201328_521769",
+        "20260426_203241_96b661",
+        "20260426_203828_fb75ec"
+      ],
+      "purpose": "Implement and harden the read-only adapter/redaction path."
+    },
+    {
+      "phase_id": "dirtycsv-delivery",
+      "range": "2026-04-27",
+      "sessions": [
+        "9eefdf31f48f",
+        "e0fc332a6ace",
+        "eb67e7146c70"
+      ],
+      "purpose": "Reach explicit dirty CSV temporal-table delivery request."
+    }
+  ],
+  "anchor_sessions": {
+    "bootstrap": "20260426_170413_da389f",
+    "hardening": "20260426_203828_fb75ec",
+    "delivery": "eb67e7146c70"
+  }
+}

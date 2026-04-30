@@ -42,6 +42,15 @@ COMPILED_SESSION = {
             "source": "session:v2-dashboard-planning",
         },
     ],
+    "key_skills": [
+        {
+            "id": "skill:graph-harness-maintain",
+            "name": "graph-harness-maintain",
+            "role": "Govern project memory, skill/tool nodes, profile boundaries, and graph traversal policy.",
+            "load_policy": "when_selected_by_project_subgraph",
+            "mount_role": "governance_protocol",
+        }
+    ],
     "graph_links": [
         {
             "source": "decision:v2-core-graph-logs",

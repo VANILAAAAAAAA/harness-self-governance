@@ -98,3 +98,124 @@ def traverse_memory_graph(repo_root: Path | str, node: str, memory_root: Path | 
         "warnings": [],
         "blockers": [],
     }
+
+
+NODE_TYPE_PRIORITY = {
+    "project_summary": 100,
+    "plan": 95,
+    "constraint": 86,
+    "requirement": 82,
+    "decision": 78,
+    "project": 70,
+    "profile": 55,
+    "policy": 50,
+    "tool": 35,
+    "skill": 35,
+    "session": -20,
+}
+EDGE_TYPE_PRIORITY = {
+    "constrains": 90,
+    "requires": 86,
+    "planned_by": 84,
+    "summarizes": 80,
+    "supports": 70,
+    "cites": 66,
+    "derived_from": 64,
+    "owns_project": 50,
+    "uses_tool": 30,
+    "uses_skill": 62,
+    "archives_session": -25,
+}
+
+
+def _query_tokens(text: str) -> set[str]:
+    import re
+    return {token for token in re.split(r"[^a-z0-9一-龥]+", text.lower()) if len(token) >= 2}
+
+
+def _node_text(node: dict[str, Any]) -> str:
+    return " ".join(str(node.get(key, "")) for key in ("id", "label", "summary", "description", "type"))
+
+
+def traverse_weighted_subgraph(
+    graph: dict[str, Any],
+    seed_nodes: list[str],
+    query: str,
+    budget_nodes: int = 24,
+    budget_edges: int = 40,
+    max_depth: int = 2,
+    allow_raw_sessions: bool = False,
+) -> dict[str, Any]:
+    """Select a small agent-readable subgraph using deterministic type/query weights.
+
+    This is the baseline before PageRank/Steiner expansion. It is intentionally
+    dependency-free and conservative: summary/plan/constraints are preferred,
+    raw/session nodes are excluded unless explicitly allowed.
+    """
+    nodes_by_id = {str(node.get("id")): node for node in graph.get("nodes", []) if node.get("id")}
+    edges = [edge for edge in graph.get("edges", []) if edge.get("source") and edge.get("target")]
+    adjacency: dict[str, list[dict[str, Any]]] = {}
+    for edge in edges:
+        adjacency.setdefault(str(edge.get("source")), []).append(edge)
+        adjacency.setdefault(str(edge.get("target")), []).append(edge)
+    query_tokens = _query_tokens(query)
+    selected: set[str] = {node_id for node_id in seed_nodes if node_id in nodes_by_id}
+    frontier: list[tuple[str, int]] = [(node_id, 0) for node_id in selected]
+    candidates: dict[str, float] = {}
+    seen_depth: dict[str, int] = {node_id: 0 for node_id in selected}
+    while frontier:
+        current, depth = frontier.pop(0)
+        if depth >= max_depth:
+            continue
+        for edge in adjacency.get(current, []):
+            neighbor = str(edge.get("target")) if str(edge.get("source")) == current else str(edge.get("source"))
+            if neighbor not in nodes_by_id:
+                continue
+            if neighbor not in seen_depth or depth + 1 < seen_depth[neighbor]:
+                seen_depth[neighbor] = depth + 1
+                frontier.append((neighbor, depth + 1))
+            node = nodes_by_id[neighbor]
+            node_type = str(node.get("type", node.get("kind", "")))
+            if node_type == "session" and not allow_raw_sessions:
+                continue
+            text_tokens = _query_tokens(_node_text(node))
+            query_score = min(30, len(query_tokens & text_tokens) * 10)
+            type_score = NODE_TYPE_PRIORITY.get(node_type, 10)
+            edge_score = EDGE_TYPE_PRIORITY.get(str(edge.get("type", edge.get("relation", ""))), 0)
+            depth_penalty = (depth + 1) * 7
+            candidates[neighbor] = max(candidates.get(neighbor, -999), type_score + query_score + edge_score - depth_penalty)
+    for node_id in selected:
+        candidates[node_id] = max(candidates.get(node_id, 0), 999)
+    ordered_nodes = [node_id for node_id, _ in sorted(candidates.items(), key=lambda item: (-item[1], item[0]))]
+    selected = set(ordered_nodes[:budget_nodes])
+    # Close over direct constraint/requirement neighbors for selected summaries/projects when budget allows.
+    for edge in sorted(edges, key=lambda item: str(item.get("id"))):
+        if len(selected) >= budget_nodes:
+            break
+        if str(edge.get("type")) not in {"constrains", "requires", "summarizes"}:
+            continue
+        endpoints = [str(edge.get("source")), str(edge.get("target"))]
+        if any(ep in selected for ep in endpoints):
+            for ep in endpoints:
+                node_type = str(nodes_by_id.get(ep, {}).get("type", ""))
+                if ep in nodes_by_id and node_type in {"constraint", "requirement", "decision"}:
+                    selected.add(ep)
+    selected_edges = []
+    for edge in sorted(edges, key=lambda item: str(item.get("id"))):
+        if len(selected_edges) >= budget_edges:
+            break
+        source = str(edge.get("source"))
+        target = str(edge.get("target"))
+        if source in selected and target in selected:
+            selected_edges.append(str(edge.get("id", f"edge:{source}:{target}")))
+    return {
+        "status": "PASS",
+        "traversal_reason": "weighted_agent_memory_subgraph_selection",
+        "selected_nodes": sorted(selected),
+        "selected_edges": selected_edges,
+        "seed_nodes": sorted([node_id for node_id in seed_nodes if node_id in nodes_by_id]),
+        "budget_used": {"budget_nodes": budget_nodes, "budget_edges": budget_edges, "max_depth": max_depth},
+        "raw_sessions_allowed": allow_raw_sessions,
+        "warnings": [],
+        "blockers": [],
+    }

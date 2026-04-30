@@ -1,0 +1,270 @@
+{
+  "actions": [
+    "Established ehrlab-local graph-harness report-only control surface, provenance repair reports, evidence locator plans, and final reviews before touching processing logic.",
+    "Built and reviewed a limited read-only adapter/redaction path with hardening fixes, including recursive redaction hardening, so data-processing evidence can be summarized safely.",
+    "Reviewed existing dirty-csv scripts/docs under the ehrtopath dirty-csv artifact area and reorganized output around a patient_trajectories_grouped.csv-style temporal table.",
+    "Adjusted presentation so field groups are represented as adjacent column groups rather than overly dense single-cell blobs."
+  ],
+  "agent_priority_order": [
+    "hard_constraints",
+    "current_state",
+    "active_phase",
+    "project_plan.todo",
+    "open_problems",
+    "key_decisions",
+    "requirements",
+    "evidence_paths"
+  ],
+  "cautions": [
+    "Do not export raw EHR/patient-level data, credentials, or sensitive schema into general; only sanitized project summaries may cross the profile boundary.",
+    "Session 20260426_171423_4714c0 is not part of dirtycsv; it remains the export_sanitized cross-profile boundary seed for harness-self-governance.",
+    "Treat raw sessions as forensic evidence only; normal reference should use the compiled project scope, project book, and generated graph nodes.",
+    "Future ehrlab data-processing projects should be added as explicit sibling projects unless the user asks to restore a work-tree hierarchy."
+  ],
+  "constraints": [
+    {
+      "id": "constraint:dirtycsv-boundary-session-excluded",
+      "source": "session:dirtycsv-project-scope",
+      "text": "The export_sanitized boundary session 20260426_171423_4714c0 stays outside dirtycsv and belongs to harness-self-governance boundary memory."
+    },
+    {
+      "id": "constraint:dirtycsv-local-only-sensitive-data",
+      "source": "profile-boundary-policy",
+      "text": "Raw EHR/patient-level data and sensitive schema stay local to ehrlab and are not exported to general."
+    }
+  ],
+  "current_problems": [
+    "Prior summaries were too shallow: they did not independently explain project goal, state, risks, evidence, and next read order.",
+    "Tool/skill capability nodes are useful governance evidence but can clutter the project view unless the UI can explicitly exclude them.",
+    "Project plan must become an agent-readable node so completed/todo state can update without relying on transient live-session notes."
+  ],
+  "current_state": [
+    "compiled project memory exists",
+    "dashboard observability exists",
+    "agent retriever pending implementation"
+  ],
+  "decisions": [
+    {
+      "id": "decision:dirtycsv-is-project",
+      "source": "session:dirtycsv-project-scope",
+      "status": "accepted",
+      "text": "dirtycsv is a standalone ehrlab project for dashboard and memory management."
+    },
+    {
+      "id": "decision:dirtycsv-dashboard-project-first",
+      "source": "session:dirtycsv-project-scope",
+      "status": "accepted",
+      "text": "Dashboard views should show dirtycsv as a project node, not collapse the ehrlab profile to a single node."
+    },
+    {
+      "id": "decision:dirtycsv-summary-must-be-project-book",
+      "source": "user-feedback:summary-quality",
+      "status": "accepted",
+      "text": "Project summary nodes must describe project purpose, actions, results, cautions, evidence, and key dependencies rather than only taxonomy."
+    }
+  ],
+  "evidence_paths": [
+    "docs/projects/ehrlab-dirtycsv-project-book.md",
+    "docs/examples/agent-memory-graph/ehrlab-dirtycsv/project-session-scope.json",
+    "docs/examples/agent-memory-graph/ehrlab-dirtycsv/compiled-session-project-scope.json",
+    "/home/vanila/code/ehrtopath/artifacts/dirty-csv"
+  ],
+  "graph_links": [
+    {
+      "source": "decision:dirtycsv-is-project",
+      "target": "project:ehrlab:dirtycsv",
+      "type": "supports"
+    },
+    {
+      "source": "requirement:dirtycsv-project-visible",
+      "target": "project:ehrlab:dirtycsv",
+      "type": "requires"
+    },
+    {
+      "source": "project:ehrlab:dirtycsv",
+      "target": "skill:ehrlab:dirtycsv:graph-harness-maintain",
+      "type": "uses_tool"
+    },
+    {
+      "source": "project:ehrlab:dirtycsv",
+      "target": "tool:python",
+      "type": "uses_tool"
+    },
+    {
+      "source": "project_summary:ehrlab:dirtycsv",
+      "target": "requirement:dirtycsv-summary-sections",
+      "type": "summarizes"
+    }
+  ],
+  "hard_constraints": [
+    {
+      "id": "constraint:dirtycsv-boundary-session-excluded",
+      "source": "session:dirtycsv-project-scope",
+      "text": "The export_sanitized boundary session 20260426_171423_4714c0 stays outside dirtycsv and belongs to harness-self-governance boundary memory."
+    },
+    {
+      "id": "constraint:dirtycsv-local-only-sensitive-data",
+      "source": "profile-boundary-policy",
+      "text": "Raw EHR/patient-level data and sensitive schema stay local to ehrlab and are not exported to general."
+    }
+  ],
+  "key_decisions": [
+    "dirtycsv is a standalone ehrlab project, not a worktree under dataprocess.",
+    "Only sanitized summaries and project-level references may cross into general governance; raw EHR/patient-level content stays local.",
+    "Future agents should read compiled project nodes first, then evidence paths, and raw sessions only for explicit forensic verification.",
+    "Key skills/tools are part of governance evidence but must be filterable/excludable in the UI."
+  ],
+  "key_skills": [
+    {
+      "id": "skill:ehrlab:dirtycsv:graph-harness-maintain",
+      "name": "graph-harness-maintain",
+      "role": "Project governance, provenance, boundary and graph compilation workflow."
+    },
+    {
+      "id": "skill:ehrlab:dirtycsv:systematic-debugging",
+      "name": "systematic-debugging",
+      "role": "Root-cause/hardening review discipline for adapter and data-processing fixes."
+    },
+    {
+      "id": "skill:ehrlab:dirtycsv:test-driven-development",
+      "name": "test-driven-development",
+      "role": "Validation discipline for generated scripts, transformations, and dashboard regressions."
+    }
+  ],
+  "key_tools": [
+    {
+      "id": "tool:python",
+      "name": "Python scripts",
+      "role": "CSV transformation, validation, JSON graph generation, and local artifact checks."
+    },
+    {
+      "id": "tool:pytest",
+      "name": "pytest",
+      "role": "Regression validation for graph/dashboard and processing helper code."
+    },
+    {
+      "id": "tool:filesystem",
+      "name": "local filesystem artifacts",
+      "role": "Local-only dirty CSV inputs/outputs and compiled project references."
+    }
+  ],
+  "memory_lifecycle": {
+    "archive_gate": "quality/scope/boundary gate before stable memory mutation",
+    "compiled_candidate": "candidate compiled from session/pending updates",
+    "compiled_memory": "agent-readable summary/plan/graph artifacts provide long-term project context; they do not override current-turn raw intent",
+    "live_session_ram": "current active Hermes session raw messages remain live short-term context and are not replaced by compiled graph memory",
+    "pending_update": "new user facts/decisions/corrections enter here first"
+  },
+  "miss_policy": {
+    "fallback_budget_rule": "at_most_one_automatic_deepening_step; never_scan_all_docs_or_raw_sessions_by_default",
+    "if_claim_not_in_summary": "traverse_evidence_once_before_answering; if still absent record_context_gap",
+    "if_new_user_decision": "capture_pending_update_not_compiled_memory",
+    "if_no_project_match": "return_zero_hit_packet_then_offer_create_pending_project_or_run_explicit_discovery",
+    "if_project_match_but_no_claim_match": "return_low_confidence_packet_with_summary_and_plan_only_then_require_user_or_single_deepening_decision",
+    "if_user_supplies_new_knowledge": "create_pending_update_with_source=this_turn_then_wait_for_archive_gate",
+    "current_session_context": "preserve_active_session_raw_messages; graph retriever governs historical/compiled project memory only"
+  },
+  "open_problems": [],
+  "phase_boundaries": [
+    {
+      "meaning": "Build report-only graph harness, provenance repair reports, evidence locator plans, and final reviews before modifying data-processing artifacts.",
+      "phase": "bootstrap/provenance safety"
+    },
+    {
+      "meaning": "Validate limited adapter/export paths and recursive redaction safeguards so project evidence can be summarized safely.",
+      "phase": "adapter/redaction hardening"
+    },
+    {
+      "meaning": "Inspect dirty-csv scripts/docs and organize the user-facing grouped temporal patient trajectory output.",
+      "phase": "dirty CSV delivery"
+    },
+    {
+      "meaning": "Promote session knowledge into project summary, plan, decision, requirement, constraint, skill/tool, and evidence nodes used for future retrieval.",
+      "phase": "compiled memory graph"
+    }
+  ],
+  "privacy": "local_only",
+  "profile_id": "ehrlab",
+  "project_goal": "Maintain an ehrlab-local, reusable DirtyCSV memory graph that explains what the dirty CSV data-cleaning project is, which sessions belong to it, what deliverables exist, and how future agents should continue the data transformation without rereading raw chat history.",
+  "project_id": "dirtycsv",
+  "project_identity": {
+    "one_line": "DirtyCSV is an ehrlab data-cleaning project that turns messy课题组CSV/field documentation into a safer temporal patient-trajectory table and supporting display documentation. The compiled project includes 19 ehrlab sessions: first building provenance/redaction/adapter safety scaffolding, then delivering the concrete dirty CSV transformation request. Outputs are local-only and must preserve patient/data boundary safeguards.",
+    "profile": "ehrlab",
+    "project": "dirtycsv"
+  },
+  "project_plan": {
+    "completed": [
+      "Classified ehrlab sessions: 19 dirtycsv sessions included; export_sanitized boundary session excluded into harness-self-governance.",
+      "Promoted dirtycsv to first-class ehrlab project in profile/project taxonomy.",
+      "Created canonical project book, session scope ledger, and compiled-session project scope JSON.",
+      "Added summary, key skill, and key tool nodes to the dashboard/governance graph."
+    ],
+    "id": "plan:ehrlab:dirtycsv",
+    "source": "agent-authored compiled project plan; should be updated by /plan-style project continuation workflows",
+    "status": "active_agent_readable",
+    "todo": [
+      "Keep project summary high-quality whenever new dirtycsv work lands: update goal/status/problems/decisions/requirements/constraints/evidence/read_order.",
+      "Wire future /plan outputs into plan:ehrlab:dirtycsv so completed/todo state updates as durable project memory.",
+      "Validate any future data transformation against ehrlab-local privacy and provenance boundaries.",
+      "If compiled memory does not answer a task, create a pending update/context gap rather than guessing from stale summaries."
+    ],
+    "update_mode": "agent_plan_command_compatible"
+  },
+  "project_status": "active_compiled_memory; project taxonomy accepted; dashboard and summary quality are being hardened from user feedback; raw/sensitive data remains ehrlab-local.",
+  "purpose": "Convert dirty CSV-style clinical/lab source tables and field group notes into a normalized, time-oriented patient trajectory view that downstream EHR2Path/data-processing work can reference without re-reading raw chat/session history.",
+  "read_order": [
+    "project_summary:ehrlab:dirtycsv — start here for purpose, state, problems, boundaries, decisions, requirements, constraints, evidence, and plan.",
+    "plan:ehrlab:dirtycsv — read completed/todo items before proposing or continuing work.",
+    "docs/projects/ehrlab-dirtycsv-project-book.md — human-readable project handbook.",
+    "docs/examples/agent-memory-graph/ehrlab-dirtycsv/project-session-scope.json — exact session inclusion/exclusion ledger.",
+    "docs/examples/agent-memory-graph/ehrlab-dirtycsv/compiled-session-project-scope.json — machine-readable compiled memory source.",
+    "Raw ehrlab sessions or /home/vanila/code/ehrtopath/artifacts/dirty-csv — forensic/data-local inspection only when compiled memory is insufficient and profile boundary permits."
+  ],
+  "requirements": [
+    {
+      "id": "requirement:dirtycsv-project-visible",
+      "source": "session:dirtycsv-project-scope",
+      "text": "When profile ehrlab is selected, the dirtycsv project must be visible as a first-class graph node."
+    },
+    {
+      "id": "requirement:dirtycsv-summary-sections",
+      "source": "user-feedback:summary-quality",
+      "text": "DirtyCSV summary must include Purpose, Actions, Results, Cautions, Evidence, Key skills, and Key tools."
+    },
+    {
+      "id": "requirement:dirtycsv-preserve-safety-scaffold",
+      "source": "session:dirtycsv-project-scope",
+      "text": "Preserve governance/provenance/adapter sessions as safety infrastructure for the dirtycsv project."
+    }
+  ],
+  "results": [
+    "dirtycsv is now a first-class project under profile ehrlab, with 19 included sessions and one export_sanitized boundary session excluded into harness-self-governance.",
+    "The project has a clear phase split: bootstrap/provenance safety, adapter implementation/hardening, and concrete dirty CSV delivery.",
+    "The intended user-facing deliverable is a grouped temporal patient trajectory CSV plus readable supporting documentation for the field classifications.",
+    "Dashboard/project graph should show EHR Lab → DirtyCSV → DirtyCSV summary instead of collapsing the project into an ambiguous ehrlab node."
+  ],
+  "routing_hints": {
+    "aliases": [
+      "data cleaning",
+      "dirty csv",
+      "dirtycsv",
+      "ehrlab",
+      "ehrlab dirtycsv"
+    ],
+    "default_entry_nodes": [
+      "project_summary:ehrlab:dirtycsv",
+      "plan:ehrlab:dirtycsv"
+    ],
+    "negative_aliases": [
+      "agent memory graph implementation",
+      "dashboard v2",
+      "harness self governance"
+    ]
+  },
+  "schema_version": "2.0",
+  "session_id": "session:dirtycsv-project-scope",
+  "summary": "DirtyCSV is an ehrlab data-cleaning project that turns messy课题组CSV/field documentation into a safer temporal patient-trajectory table and supporting display documentation. The compiled project includes 19 ehrlab sessions: first building provenance/redaction/adapter safety scaffolding, then delivering the concrete dirty CSV transformation request. Outputs are local-only and must preserve patient/data boundary safeguards.",
+  "summary_contract": "agent_readable_project_context_v1",
+  "current_session_raw_context": "preserved_by_hermes_live_context_not_graph_memory",
+  "compiled_memory_raw_session_reads": false
+}

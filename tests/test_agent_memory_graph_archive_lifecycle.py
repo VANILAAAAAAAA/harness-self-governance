@@ -129,5 +129,5 @@ def test_curated_compiled_session_examples_pass_archive_quality_validation() -> 
     report = validate_compiled_session_examples(EXAMPLES)
     assert report["status"] == "PASS"
     assert report["archive_quality_status"] == "PASS"
-    assert report["example_count"] == 7
+    assert report["example_count"] == 9
     assert report["blockers"] == []

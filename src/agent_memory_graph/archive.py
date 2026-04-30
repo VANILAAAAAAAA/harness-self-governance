@@ -3,6 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+
+def _slug(value: str) -> str:
+    import re
+    return re.sub(r'[^a-z0-9一-龥]+', '-', str(value).lower()).strip('-') or 'unnamed'
+
 from .export import write_global_graph
 from .lineage import write_global_lineage
 from .profiles import ensure_profile, load_profile
@@ -36,6 +41,7 @@ def _merge_summary(existing: dict[str, Any], payload: dict[str, Any]) -> dict[st
     summary['requirements'] = stable_items_by_id(list(summary.get('requirements', [])) + list(payload.get('requirements', [])))
     summary['constraints'] = stable_items_by_id(list(summary.get('constraints', [])) + list(payload.get('constraints', [])))
     summary['graph_links'] = stable_links(list(summary.get('graph_links', [])) + list(payload.get('graph_links', [])))
+    summary['key_skills'] = stable_items_by_id(list(summary.get('key_skills', [])) + list(payload.get('key_skills', [])), id_key='id')
     summary['warnings'] = []
     summary['blockers'] = []
     return summary
@@ -46,10 +52,13 @@ def _build_graph_fragment(profile_id: str, project_id: str, summary: dict[str, A
         {'id': f'profile:{profile_id}', 'type': 'profile', 'label': profile_id},
         {'id': f'project:{profile_id}:{project_id}', 'type': 'project', 'label': project_id},
         {'id': f'project_summary:{profile_id}:{project_id}', 'type': 'project_summary', 'label': f'{project_id} summary'},
+        {'id': f'plan:{profile_id}:{project_id}', 'type': 'plan', 'label': f'{project_id} plan', 'metadata': summary.get('project_plan', {'completed': [], 'todo': [], 'update_mode': 'agent_plan_command_compatible'})},
     ]
     edges = [
         {'id': f'edge:profile:{profile_id}:owns-project:{project_id}', 'source': f'profile:{profile_id}', 'target': f'project:{profile_id}:{project_id}', 'type': 'owns_project'},
         {'id': f'edge:project:{project_id}:summarizes', 'source': f'project:{profile_id}:{project_id}', 'target': f'project_summary:{profile_id}:{project_id}', 'type': 'summarizes'},
+        {'id': f'edge:project:{project_id}:planned-by', 'source': f'project:{profile_id}:{project_id}', 'target': f'plan:{profile_id}:{project_id}', 'type': 'planned_by'},
+        {'id': f'edge:summary:{project_id}:requires-plan', 'source': f'project_summary:{profile_id}:{project_id}', 'target': f'plan:{profile_id}:{project_id}', 'type': 'requires'},
     ]
     for section, node_type, relation in (
         ('decisions', 'decision', 'summarizes'),
@@ -62,6 +71,26 @@ def _build_graph_fragment(profile_id: str, project_id: str, summary: dict[str, A
                 continue
             nodes.append({'id': ident, 'type': node_type, 'label': item.get('text', ident)[:80], 'summary': item.get('text', ident)})
             edges.append({'id': f'edge:summary:{ident}', 'source': f'project_summary:{profile_id}:{project_id}', 'target': ident, 'type': relation})
+    for skill in summary.get('key_skills', []):
+        name = skill.get('name') or skill.get('id') or 'unnamed-skill'
+        ident = skill.get('id') or f"skill:{_slug(name)}"
+        role = skill.get('role') or skill.get('summary') or f"Procedural skill for {project_id}"
+        nodes.append({
+            'id': ident,
+            'type': 'skill',
+            'label': name,
+            'summary': role,
+            'metadata': {
+                'skill': name,
+                'profile_id': profile_id,
+                'project_id': project_id,
+                'role': role,
+                'load_policy': skill.get('load_policy', 'when_selected_by_project_subgraph'),
+                'mount_role': skill.get('mount_role', 'procedural_adapter'),
+            },
+        })
+        edges.append({'id': f"edge:project:{project_id}:uses-skill:{_slug(ident)}", 'source': f'project:{profile_id}:{project_id}', 'target': ident, 'type': 'uses_skill'})
+        edges.append({'id': f"edge:summary:{project_id}:summarizes-skill:{_slug(ident)}", 'source': f'project_summary:{profile_id}:{project_id}', 'target': ident, 'type': 'summarizes'})
     for session in summary.get('session_summaries', []):
         ident = session.get('session_id')
         if not ident:

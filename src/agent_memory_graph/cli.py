@@ -14,6 +14,7 @@ from .export import export_repo_projection
 from .maintenance import generate_archive_maintenance_proposal, validate_archive_maintenance, write_archive_maintenance_report
 from .pending_updates import capture_pending_update
 from .repo_adapter import init_repo_manifest
+from .retrieve import retrieve_project_context
 from .router import route_query
 from .traversal import traverse_memory_graph
 from .schemas import resolve_memory_root
@@ -57,6 +58,17 @@ def build_parser() -> argparse.ArgumentParser:
     route.add_argument("--query", required=True)
     route.add_argument("--memory-root", default=None)
     route.add_argument("--context-budget", default="fast", choices=("fast", "normal", "deep", "forensic"))
+
+    retrieve = sub.add_parser("retrieve", help="Retrieve agent-readable compiled project context")
+    retrieve.add_argument("--repo", default=".")
+    retrieve.add_argument("--query", required=True)
+    retrieve.add_argument("--memory-root", default=None)
+    retrieve.add_argument("--budget", default="fast", choices=("fast", "normal", "deep", "forensic"))
+    retrieve.add_argument("--evidence-depth", default="anchor", choices=("none", "anchor", "excerpt", "raw-span"))
+    retrieve.add_argument("--refresh-index", action="store_true")
+    retrieve.add_argument("--refresh-graph", action="store_true")
+    retrieve.add_argument("--profile", default=None)
+    retrieve.add_argument("--project", default=None)
 
     traverse = sub.add_parser("traverse", help="Traverse Agent Memory Graph nodes and edges")
     traverse.add_argument("--repo", default=".")
@@ -144,6 +156,20 @@ def main(argv: list[str] | None = None) -> int:
         report = route_query(Path(args.repo), args.query, args.memory_root, context_budget=args.context_budget)
         _print(report)
         return 0 if report["status"] in {"PASS", "MISS", "AMBIGUOUS"} else 1
+    if args.command == "retrieve":
+        report = retrieve_project_context(
+            Path(args.repo),
+            args.query,
+            profile_hint=args.profile,
+            project_hint=args.project,
+            memory_root=args.memory_root,
+            budget=args.budget,
+            evidence_depth=args.evidence_depth,
+            refresh_index=args.refresh_index,
+            refresh_graph=args.refresh_graph,
+        )
+        _print(report)
+        return 0 if report["status"] in {"PASS", "MISS", "AMBIGUOUS", "LOW_CONFIDENCE", "NEW_INFORMATION"} else 1
     if args.command == "traverse":
         report = traverse_memory_graph(Path(args.repo), args.node, args.memory_root, max_depth=args.max_depth)
         _print(report)

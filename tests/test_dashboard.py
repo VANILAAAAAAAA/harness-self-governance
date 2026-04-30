@@ -57,7 +57,11 @@ def test_dashboard_file_generated_as_two_page_graph_logs_app() -> None:
         "panZoomState",
         "type-filter-panel",
         "visible-node-count",
-        "filterNodesByType",
+        "includeNodeType",
+        "excludeNodeType",
+        "excludedGraphTypes",
+        "Filter / block types",
+        "Search node types, e.g. tool or skill",
         "clearGraphFilters",
         "activeGraphTypes",
         "activeEdgeTypes",
@@ -88,11 +92,14 @@ def test_dashboard_file_generated_as_two_page_graph_logs_app() -> None:
         "mappingStatusForRef",
         "preferred_path",
         "view_in_logs_requires_mapping",
-        "No projects archived for this profile yet",
+        "Project-first map",
+        "dirtycsv",
+        "project-card",
         "Graph diagnostic summary",
         "Context Router",
         "Budgeted traversal",
-        "Raw sessions: forensic only",
+        "Historical raw sessions: forensic only",
+        "Current session raw: live context preserved",
         "data-router-sample=\"view-in-logs\"",
         "data-router-sample=\"log定位\"",
         "data-router-sample=\"new-information\"",
@@ -119,6 +126,7 @@ def test_dashboard_file_generated_as_two_page_graph_logs_app() -> None:
         "data-graph-mode=\"focus\"",
         "data-graph-mode=\"full\"",
         "Overview · curated",
+        "scopedHubId",
         "Focus · 1-hop",
         "Overview = curated system map",
         "activeGraphMode = 'overview'",
@@ -194,7 +202,45 @@ def test_dashboard_embeds_graph_logs_sessions_and_safety_data() -> None:
     assert data["graph_summary"]["diagnostics"]
     assert data["graph_summary"]["hubs"]
     assert "tool" in data["graph_filter_types"]
+    assert "skill" in data["graph_filter_types"]
+    assert "plan" in data["graph_filter_types"]
     assert "knowledge_source" in data["graph_filter_types"]
+    harness_summary = next(node for node in data["graph"]["nodes"] if node["id"] == "project_summary:general:harness-self-governance")
+    harness_sections = harness_summary["metadata"]["summary_sections"]
+    assert harness_sections["project_goal"]
+    assert harness_sections["project_status"]
+    assert harness_sections["current_problems"]
+    assert harness_sections["phase_boundaries"]
+    assert harness_sections["key_decisions"]
+    assert harness_sections["read_order"]
+    assert harness_sections["memory_lifecycle"]["archive_gate"]
+    assert harness_sections["project_plan"]["completed"]
+    assert harness_sections["project_plan"]["todo"]
+    assert any(node["id"] == "plan:general:harness-self-governance" for node in data["graph"]["nodes"])
+    dirty_summary = next(node for node in data["graph"]["nodes"] if node["id"] == "project_summary:ehrlab:dirtycsv")
+    sections = dirty_summary["metadata"]["summary_sections"]
+    assert sections["project_goal"]
+    assert sections["project_status"]
+    assert sections["current_problems"]
+    assert sections["phase_boundaries"]
+    assert sections["key_decisions"]
+    assert sections["purpose"]
+    assert sections["actions"]
+    assert sections["results"]
+    assert sections["requirements"]
+    assert sections["constraints"]
+    assert sections["cautions"]
+    assert sections["evidence_paths"]
+    assert sections["read_order"]
+    assert sections["memory_lifecycle"]["pending_update"]
+    assert sections["memory_lifecycle"]["archive_gate"]
+    assert sections["project_plan"]["completed"]
+    assert sections["project_plan"]["todo"]
+    assert sections["key_skills"]
+    assert sections["key_tools"]
+    assert any(node["id"] == "plan:ehrlab:dirtycsv" for node in data["graph"]["nodes"])
+    assert any(node["id"] == "skill:graph-harness-maintain" for node in data["graph"]["nodes"])
+    assert any(node["id"] == "tool:python" for node in data["graph"]["nodes"])
     assert data["log_groups"] == ["profiles", "projects", "sessions", "summaries", "decisions", "requirements", "artifacts", "policies", "provenance", "system"]
     assert data["profile_index"]["active_profile"] == "general"
     assert {profile["profile_id"] for profile in data["profile_index"]["profiles"]} >= {"general", "ehrlab"}
@@ -204,7 +250,9 @@ def test_dashboard_embeds_graph_logs_sessions_and_safety_data() -> None:
     assert data["pipeline_status"].get("agent_triggered_archive") is True
     assert data["context_router"]["available"] is True
     assert data["context_router"]["raw_sessions_default_read"] is False
-    assert data["context_router"]["raw_sessions_policy"] == "explicit_forensic_only"
+    assert data["context_router"]["raw_sessions_policy"] == "historical_raw_sessions_explicit_forensic_only; current_live_session_raw_context_preserved_by_hermes"
+    assert data["context_router"]["current_session_raw_context"] == "preserved_by_hermes_live_context_not_graph_memory"
+    assert data["context_router"]["compiled_memory_raw_session_reads"] is False
     router = data["context_router"]
     assert router["index_path"].endswith("context-index.json")
     assert router["context_index"]["routing_table_type"] == "graph_traversal_context_index"

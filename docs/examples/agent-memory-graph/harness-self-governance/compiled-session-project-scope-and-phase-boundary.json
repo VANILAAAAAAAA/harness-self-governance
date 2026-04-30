@@ -1,0 +1,238 @@
+{
+  "agent_priority_order": [
+    "hard_constraints",
+    "current_state",
+    "active_phase",
+    "project_plan.todo",
+    "open_problems",
+    "key_decisions",
+    "requirements",
+    "evidence_paths"
+  ],
+  "compiled_memory_raw_session_reads": false,
+  "constraints": [
+    {
+      "id": "constraint:project-no-default-root-import",
+      "source": "session:project-scope-and-phase-boundary",
+      "text": "Default/root sessions are excluded from this project compilation even if raw files exist locally."
+    },
+    {
+      "id": "constraint:project-no-dirty-csv-ehrlab-import",
+      "source": "session:project-scope-and-phase-boundary",
+      "text": "ehrlab dirtycsv project sessions must remain separate from harness-self-governance project memory, except for the single export_sanitized boundary seed."
+    }
+  ],
+  "current_problems": [
+    "Dashboard controls previously exposed too many node-type chips in one unreadable block.",
+    "Summary nodes must become high-quality agent context entry points rather than shallow labels.",
+    "Plan state must be represented as graph nodes and remain updateable by agent /plan workflows."
+  ],
+  "current_session_raw_context": "preserved_by_hermes_live_context_not_graph_memory",
+  "current_state": [
+    "compiled project memory exists",
+    "dashboard observability exists",
+    "agent retriever pending implementation"
+  ],
+  "decisions": [
+    {
+      "id": "decision:project-scope-general-all",
+      "source": "session:project-scope-and-phase-boundary",
+      "status": "accepted",
+      "text": "All general-profile sessions in the selected corpus are treated as harness-self-governance project history."
+    },
+    {
+      "id": "decision:project-scope-ehrlab-boundary-only",
+      "source": "session:project-scope-and-phase-boundary",
+      "status": "accepted",
+      "text": "Only the ehrlab export_sanitized boundary session is imported into this project compilation; other ehrlab sessions belong to the separate ehrlab dirtycsv project."
+    },
+    {
+      "id": "decision:project-phase-boundaries-retained",
+      "source": "session:project-scope-and-phase-boundary",
+      "status": "accepted",
+      "text": "v1.0, v1.1, and v2.0 remain one project lineage but must stay phase-separated in the compiled reference."
+    },
+    {
+      "id": "decision:project-book-human-reference",
+      "source": "session:project-scope-and-phase-boundary",
+      "status": "accepted",
+      "text": "A human-readable project book should accompany compiled-session artifacts so the archive can serve as a reusable project handbook."
+    }
+  ],
+  "evidence_paths": [],
+  "graph_links": [
+    {
+      "source": "decision:project-scope-general-all",
+      "target": "project:general:harness-self-governance",
+      "type": "supports"
+    },
+    {
+      "source": "decision:project-scope-ehrlab-boundary-only",
+      "target": "requirement:project-reference-cross-profile-boundary",
+      "type": "supports"
+    },
+    {
+      "source": "decision:project-phase-boundaries-retained",
+      "target": "requirement:project-reference-phase-ledger",
+      "type": "supports"
+    },
+    {
+      "source": "decision:project-book-human-reference",
+      "target": "artifact:docs/projects/harness-self-governance-project-book.md",
+      "type": "documented_by"
+    },
+    {
+      "source": "constraint:project-no-default-root-import",
+      "target": "project:general:harness-self-governance",
+      "type": "constrains"
+    },
+    {
+      "source": "constraint:project-no-dirty-csv-ehrlab-import",
+      "target": "project:general:harness-self-governance",
+      "type": "constrains"
+    }
+  ],
+  "hard_constraints": [
+    {
+      "id": "constraint:project-no-default-root-import",
+      "source": "session:project-scope-and-phase-boundary",
+      "text": "Default/root sessions are excluded from this project compilation even if raw files exist locally."
+    },
+    {
+      "id": "constraint:project-no-dirty-csv-ehrlab-import",
+      "source": "session:project-scope-and-phase-boundary",
+      "text": "ehrlab dirtycsv project sessions must remain separate from harness-self-governance project memory, except for the single export_sanitized boundary seed."
+    }
+  ],
+  "key_decisions": [
+    "All general-profile sessions in scope belong to harness-self-governance.",
+    "ehrlab dirtycsv remains a separate project; only export_sanitized boundary seed crosses into harness-self-governance.",
+    "Compiled project memory is the default retrieval layer; live session is temporary RAM.",
+    "New information must enter pending update / compiled candidate and pass archive gate before becoming durable compiled memory."
+  ],
+  "key_skills": [
+    {
+      "id": "skill:graph-harness-maintain",
+      "load_policy": "when_selected_by_project_subgraph",
+      "mount_role": "governance_protocol",
+      "name": "graph-harness-maintain",
+      "role": "Govern project memory, skill/tool nodes, profile boundaries, graph traversal policy, and archive/rehydration safety for this self-governance project."
+    },
+    {
+      "id": "skill:hermes-agent",
+      "load_policy": "when_harness_runtime_or_profile_integration_is_selected",
+      "mount_role": "runtime_adapter_protocol",
+      "name": "hermes-agent",
+      "role": "Configure or integrate Hermes runtime/profile adapters after graph memory protocol is verified."
+    }
+  ],
+  "memory_lifecycle": {
+    "archive_gate": "quality/scope/boundary gate before stable memory mutation",
+    "compiled_candidate": "candidate compiled from session/pending updates",
+    "compiled_memory": "agent-readable summary/plan/graph artifacts provide long-term project context; they do not override current-turn raw intent",
+    "live_session_ram": "current active Hermes session raw messages remain live short-term context and are not replaced by compiled graph memory",
+    "pending_update": "new user facts/decisions/corrections enter here first"
+  },
+  "miss_policy": {
+    "current_session_context": "preserve_active_session_raw_messages; graph retriever governs historical/compiled project memory only",
+    "fallback_budget_rule": "at_most_one_automatic_deepening_step; never_scan_all_docs_or_raw_sessions_by_default",
+    "if_claim_not_in_summary": "traverse_evidence_once_before_answering; if still absent record_context_gap",
+    "if_new_user_decision": "capture_pending_update_not_compiled_memory",
+    "if_no_project_match": "return_zero_hit_packet_then_offer_create_pending_project_or_run_explicit_discovery",
+    "if_project_match_but_no_claim_match": "return_low_confidence_packet_with_summary_and_plan_only_then_require_user_or_single_deepening_decision",
+    "if_user_supplies_new_knowledge": "create_pending_update_with_source=this_turn_then_wait_for_archive_gate"
+  },
+  "open_problems": [],
+  "phase_boundaries": [
+    {
+      "meaning": "Establish safe general↔ehrlab boundary through one sanitized export seed only.",
+      "phase": "cross-profile bootstrap"
+    },
+    {
+      "meaning": "Read-only artifacts, provenance, safety boundary, and validation baseline.",
+      "phase": "v1.0 local governance baseline"
+    },
+    {
+      "meaning": "Proposal/review/apply-gate model without destructive autonomous execution.",
+      "phase": "v1.1 reviewed action layer"
+    },
+    {
+      "meaning": "Project-first dashboard, session compilation, context router, summary/plan nodes, filterable skills/tools, and long-term project memory. ",
+      "phase": "v2.0 graph/dashboard/router/memory graph"
+    }
+  ],
+  "privacy": "local_only",
+  "profile_id": "general",
+  "project_goal": "Make harness-self-governance the stable long-term context layer for Hermes governance work, while preserving phase boundaries and profile separation.",
+  "project_id": "harness-self-governance",
+  "project_identity": {
+    "one_line": "Manual project compilation defines harness-self-governance scope: include all general sessions, include one ehrlab cross-profile governance boundary seed, exclude default/root sessions, and treat the remaining ehrlab sessions as part of the separate ehrlab dirtycsv project while preserving v1.0 / v1.1 / v2.0 as distinct phases within one project narrative.",
+    "profile": "general",
+    "project": "harness-self-governance"
+  },
+  "project_plan": {
+    "completed": [
+      "Compiled general sessions into harness-self-governance project scope with v1/v1.1/v2 phase boundaries.",
+      "Separated ehrlab dirtycsv as standalone project while retaining one sanitized boundary seed.",
+      "Built project-first dashboard with profile/project/summary/skill/tool graph nodes and read-only safety UI.",
+      "Added visual QA fixes: five semantic colors, compact nodes, no accidental text selection, subtle edge selection."
+    ],
+    "id": "plan:general:harness-self-governance",
+    "source": "agent-authored plan node; should be kept in sync with /plan-style work and dashboard state",
+    "status": "active_agent_readable",
+    "todo": [
+      "Keep summary nodes strong enough to serve as default agent long-term context.",
+      "Integrate future /plan command outputs into plan nodes with completed/todo state updates.",
+      "Use pending update / compiled candidate / archive gate before promoting new session facts to compiled memory.",
+      "When project matching fails, create a context gap or pending update instead of guessing a project assignment."
+    ],
+    "update_mode": "agent_plan_command_compatible"
+  },
+  "project_status": "active_v2_dashboard_memory_graph_hardening; v1/v1.1/v2 boundaries are compiled; UI and summary quality are being aligned to user feedback.",
+  "purpose": "Build Hermes graph-harness self-governance: a local, auditable, project-level Memory Graph where agents read compiled summaries/plans/decisions/requirements/constraints/evidence before raw sessions.",
+  "read_order": [
+    "project_summary:general:harness-self-governance — start with project goal, status, problems, phase boundaries, decisions, constraints, evidence, plan.",
+    "plan:general:harness-self-governance — inspect completed/todo before continuing implementation.",
+    "docs/projects/harness-self-governance-project-book.md — human-readable project handbook.",
+    "docs/examples/agent-memory-graph/harness-self-governance/project-session-scope.json — session scope ledger.",
+    "docs/examples/agent-memory-graph/harness-self-governance/compiled-session-project-scope-and-phase-boundary.json — machine-readable compiled scope and phase boundary.",
+    "Raw sessions — forensic fallback only when compiled graph lacks evidence."
+  ],
+  "requirements": [
+    {
+      "id": "requirement:project-reference-phase-ledger",
+      "source": "session:project-scope-and-phase-boundary",
+      "text": "The compiled project must expose phase boundaries, source-session scope, and anchor milestones so future retrieval can distinguish v1.0 from v2.0 without splitting the project."
+    },
+    {
+      "id": "requirement:project-reference-cross-profile-boundary",
+      "source": "session:project-scope-and-phase-boundary",
+      "text": "The compiled project must preserve the general↔ehrlab governance boundary as a first-class project concept."
+    }
+  ],
+  "routing_hints": {
+    "aliases": [
+      "Hermes governance",
+      "agent memory graph",
+      "dashboard v2",
+      "general",
+      "graph harness",
+      "harness self governance",
+      "harness-self-governance",
+      "self governance"
+    ],
+    "default_entry_nodes": [
+      "project_summary:general:harness-self-governance",
+      "plan:general:harness-self-governance"
+    ],
+    "negative_aliases": [
+      "dirtycsv",
+      "patient data",
+      "raw ehr"
+    ]
+  },
+  "schema_version": "2.0",
+  "session_id": "session:project-scope-and-phase-boundary",
+  "summary": "Manual project compilation defines harness-self-governance scope: include all general sessions, include one ehrlab cross-profile governance boundary seed, exclude default/root sessions, and treat the remaining ehrlab sessions as part of the separate ehrlab dirtycsv project while preserving v1.0 / v1.1 / v2.0 as distinct phases within one project narrative.",
+  "summary_contract": "agent_readable_project_context_v1"
+}

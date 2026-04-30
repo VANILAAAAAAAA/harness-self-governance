@@ -1,0 +1,31 @@
+{
+  "anchors": [
+    {
+      "anchor_id": "raw_anchor:ehrlab:dirtycsv:project-scope-decision",
+      "claim_ids": [
+        "decision:dirtycsv-standalone-project",
+        "constraint:no-ehr-raw-export-to-general"
+      ],
+      "message_range": [
+        1,
+        4
+      ],
+      "profile": "ehrlab",
+      "project": "dirtycsv",
+      "raw_path": "sessions/raw/20260426-dirtycsv-project-scope.jsonl",
+      "read_policy": "evidence_deepening_only",
+      "safe_excerpt": "dirtycsv is the canonical ehrlab project for dirty CSV/data-cleaning work. General governance may use sanitized summaries only; sensitive or patient-level raw data must not cross profile boundaries.",
+      "sensitivity": "internal",
+      "source_session_id": "20260426_171423_4714c0",
+      "span_type": "decision",
+      "tags": [
+        "dirtycsv",
+        "project-scope",
+        "ehrlab",
+        "sanitized-export"
+      ]
+    }
+  ],
+  "index_type": "raw_evidence_anchor_index",
+  "schema_version": "2.0"
+}

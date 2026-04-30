@@ -36,7 +36,7 @@ def build_profile_index() -> dict[str, Any]:
                 "label": "EHR Lab",
                 "role": "knowledge_profile",
                 "description": "Domain/project profile for EHR and healthcare modeling work.",
-                "projects": [],
+                "projects": ["dirtycsv"],
             },
         ],
         "warnings": [],

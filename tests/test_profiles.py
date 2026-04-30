@@ -17,7 +17,7 @@ def test_profile_index_includes_general_and_ehrlab(tmp_path: Path) -> None:
     assert {"general", "ehrlab"}.issubset(profiles)
     assert profiles["general"]["role"] == "governance_hub"
     assert profiles["general"]["projects"] == ["harness-self-governance"]
-    assert profiles["ehrlab"]["projects"] == []
+    assert profiles["ehrlab"]["projects"] == ["dirtycsv"]
 
 
 def test_profile_validation_passes_for_default_index(tmp_path: Path) -> None:

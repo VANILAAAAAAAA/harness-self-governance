@@ -4,6 +4,11 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+
+def _slug(value: str) -> str:
+    import re
+    return re.sub(r'[^a-z0-9一-龥]+', '-', str(value).lower()).strip('-') or 'unnamed'
+
 from .archive_triggers import write_archive_trigger_report
 from .lineage import write_global_lineage
 from .profiles import build_profile_index, ensure_profile
@@ -55,13 +60,16 @@ def build_global_graph(memory_root: Path, profile_id: str, project_id: str) -> d
     nodes = [
         _node(f'profile:{profile_id}', 'profile', profile_id, summary=f'{profile_id} profile context'),
         _node(f'project:{profile_id}:{project_id}', 'project', project_id, summary=f'Active project {project_id}'),
-        _node(f'project_summary:{profile_id}:{project_id}', 'project_summary', f'{project_id} summary', summary=summary.get('summary') or 'Project summary'),
+        _node(f'project_summary:{profile_id}:{project_id}', 'project_summary', f'{project_id} summary', summary=summary.get('summary') or 'Project summary', metadata={'summary_contract': summary.get('summary_contract'), 'agent_priority_order': summary.get('agent_priority_order', [])}),
+        _node(f'plan:{profile_id}:{project_id}', 'plan', f'{project_id} plan', summary='Agent-readable project plan with completed/todo items.', metadata=summary.get('project_plan', {'completed': [], 'todo': [], 'update_mode': 'agent_plan_command_compatible'})),
         _node('protocol:graph-governed-context', 'policy', 'graph-governed context protocol', summary='Graph-first context loading; raw sessions last.'),
         _node('tool:agent-graph-cli', 'tool', 'agent-graph CLI', summary='Portable CLI for repo manifest, bootstrap, validate, archive-session, and export commands.'),
     ]
     edges = [
         _edge(f'edge:profile:{profile_id}:owns-project:{project_id}', f'profile:{profile_id}', f'project:{profile_id}:{project_id}', 'owns_project'),
         _edge(f'edge:project:{profile_id}:{project_id}:summarizes', f'project:{profile_id}:{project_id}', f'project_summary:{profile_id}:{project_id}', 'summarizes'),
+        _edge(f'edge:project:{profile_id}:{project_id}:planned-by', f'project:{profile_id}:{project_id}', f'plan:{profile_id}:{project_id}', 'planned_by'),
+        _edge(f'edge:summary:{profile_id}:{project_id}:requires-plan', f'project_summary:{profile_id}:{project_id}', f'plan:{profile_id}:{project_id}', 'requires'),
         _edge(f'edge:project:{profile_id}:{project_id}:governed-by-protocol', f'project:{profile_id}:{project_id}', 'protocol:graph-governed-context', 'governed_by'),
         _edge(f'edge:project:{profile_id}:{project_id}:uses-agent-graph', f'project:{profile_id}:{project_id}', 'tool:agent-graph-cli', 'uses_tool'),
     ]
@@ -83,6 +91,26 @@ def build_global_graph(memory_root: Path, profile_id: str, project_id: str) -> d
             continue
         nodes.append(_node(constraint_id, 'constraint', constraint.get('text', constraint_id)[:80], summary=constraint.get('text', constraint_id), metadata={'source': constraint.get('source')}))
         edges.append(_edge(f'edge:summary:{constraint_id}', f'project_summary:{profile_id}:{project_id}', constraint_id, 'constrains'))
+    for skill in summary.get('key_skills', []):
+        name = skill.get('name') or skill.get('id') or 'unnamed-skill'
+        skill_id = skill.get('id') or f"skill:{_slug(name)}"
+        role = skill.get('role') or skill.get('summary') or f"Procedural skill for {project_id}"
+        nodes.append(_node(
+            skill_id,
+            'skill',
+            name,
+            summary=role,
+            metadata={
+                'skill': name,
+                'profile_id': profile_id,
+                'project_id': project_id,
+                'role': role,
+                'load_policy': skill.get('load_policy', 'when_selected_by_project_subgraph'),
+                'mount_role': skill.get('mount_role', 'procedural_adapter'),
+            },
+        ))
+        edges.append(_edge(f"edge:project:{profile_id}:{project_id}:uses-skill:{_slug(skill_id)}", f'project:{profile_id}:{project_id}', skill_id, 'uses_skill', confidence=0.85))
+        edges.append(_edge(f"edge:summary:{profile_id}:{project_id}:summarizes-skill:{_slug(skill_id)}", f'project_summary:{profile_id}:{project_id}', skill_id, 'summarizes', confidence=0.75))
     for session in bundle['session_index'].get('sessions', []):
         session_id = session.get('session_id')
         if not session_id:

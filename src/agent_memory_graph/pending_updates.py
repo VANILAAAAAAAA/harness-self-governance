@@ -12,7 +12,7 @@ def _update_id(profile_id: str, project_id: str, text: str) -> str:
     return f"pending-update:{digest}"
 
 
-def capture_pending_update(repo_root: Path | str, text: str, profile_id: str, project_id: str, memory_root: Path | str | None = None) -> dict[str, Any]:
+def capture_pending_update(repo_root: Path | str, text: str, profile_id: str, project_id: str, memory_root: Path | str | None = None, source: str = "current_turn", update_type: str = "new_information") -> dict[str, Any]:
     repo_root = Path(repo_root).resolve()
     memory_root = resolve_memory_root(memory_root)
     target = memory_root / "routing" / "pending-updates.json"
@@ -29,9 +29,12 @@ def capture_pending_update(repo_root: Path | str, text: str, profile_id: str, pr
         "project": project_id,
         "text": text,
         "status": "pending_archive_compilation",
+        "lifecycle_state": "pending_update",
+        "update_type": update_type,
         "raw_sessions_allowed": False,
         "created_at": utc_now(),
-        "source": "agent_graph_capture_update",
+        "source": source,
+        "archive_gate_required": True,
     }
     updates = {item.get("id"): item for item in payload.get("updates", []) if isinstance(item, dict)}
     updates[update["id"]] = update

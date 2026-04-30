@@ -27,7 +27,7 @@ def _compiled_examples() -> list[Path]:
 
 def test_compiled_session_examples_are_valid_and_curated() -> None:
     examples = _compiled_examples()
-    assert len(examples) == 7
+    assert len(examples) == 9
     for path in examples:
         payload = json.loads(path.read_text(encoding="utf-8"))
         assert payload["schema_version"] == SCHEMA_VERSION
