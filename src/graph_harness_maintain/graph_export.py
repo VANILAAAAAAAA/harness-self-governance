@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from agent_memory_graph.profile_local_graph import load_profile_graph_projection
+
 SCHEMA_VERSION = "2.0"
 
 REQUIRED_NODE_TYPES = {
@@ -488,6 +490,11 @@ def build_governance_graph(repo_root: Path | str) -> dict[str, Any]:
     edges.extend(session_edges)
     warnings.extend(session_warnings)
     edges.extend(_lineage_map_edges(repo_root, nodes, edges))
+
+    dirtycsv_projection = load_profile_graph_projection("ehrlab", "dirtycsv")
+    nodes.extend(dirtycsv_projection.get("nodes", []))
+    edges.extend(dirtycsv_projection.get("edges", []))
+    warnings.extend(dirtycsv_projection.get("warnings", []))
 
     nodes = sorted(nodes, key=lambda item: item["id"])
     edges = sorted(edges, key=lambda item: item["id"])

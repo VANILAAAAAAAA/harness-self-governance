@@ -11,6 +11,7 @@ from .context_packet import build_context_packet
 from .evidence_anchor import EVIDENCE_DEPTHS, load_raw_evidence_index, select_raw_evidence_anchors
 from .export import write_global_graph
 from .pending_updates import capture_pending_update
+from .profile_local_graph import profile_graph_text
 from .projects import load_project_bundle
 from .repo_adapter import read_repo_manifest
 from .schemas import SCHEMA_VERSION, deterministic_write_json, read_json, resolve_memory_root
@@ -194,12 +195,13 @@ def _build_project_routing_cache(repo_root: Path, memory_root: Path) -> dict[str
             for key in ("claim_ids", "tags"):
                 if isinstance(anchor.get(key), list):
                     anchor_text_parts.extend(str(item) for item in anchor.get(key, []))
+        local_profile_text = profile_graph_text(profile_id, project_id)
         candidates.append({
             "profile": profile_id,
             "project": project_id,
             "aliases": sorted(set(alias for alias in aliases if alias)),
             "negative_aliases": sorted(set(alias for alias in negative_aliases if alias)),
-            "summary_tokens": sorted(_tokens(_summary_text(summary) + "\n" + "\n".join(anchor_text_parts))),
+            "summary_tokens": sorted(_tokens(_summary_text(summary) + "\n" + "\n".join(anchor_text_parts) + "\n" + local_profile_text)),
             "summary_source_path": summary.get("source_path"),
         })
     payload = {

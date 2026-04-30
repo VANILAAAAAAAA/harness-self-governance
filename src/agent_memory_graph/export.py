@@ -11,6 +11,7 @@ def _slug(value: str) -> str:
 
 from .archive_triggers import write_archive_trigger_report
 from .lineage import write_global_lineage
+from .profile_local_graph import load_profile_graph_projection
 from .profiles import build_profile_index, ensure_profile
 from .projects import ensure_project, load_project_bundle
 from .repo_adapter import read_repo_manifest
@@ -123,6 +124,10 @@ def build_global_graph(memory_root: Path, profile_id: str, project_id: str) -> d
         link_type = link.get('type')
         if source and target and link_type:
             edges.append(_edge(f'edge:{source}:{link_type}:{target}', source, target, link_type, confidence=0.8))
+    profile_projection = load_profile_graph_projection(profile_id, project_id)
+    nodes.extend(profile_projection.get('nodes', []))
+    edges.extend(profile_projection.get('edges', []))
+    graph.setdefault('warnings', []).extend(profile_projection.get('warnings', []))
     graph['nodes'] = sorted(nodes, key=lambda item: item['id'])
     graph['edges'] = sorted(edges, key=lambda item: item['id'])
     maintenance = read_json(memory_root / 'reports' / 'archive-maintenance-report.json')
