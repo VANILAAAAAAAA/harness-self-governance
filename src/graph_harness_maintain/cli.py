@@ -12,6 +12,7 @@ from .evidence import write_evidence_index
 from .gates import check_action_allowed, ensure_policy_file, load_policy, write_gate_check
 from .identity import run_identity_check
 from .dashboard import build_dashboard
+from .dashboard_server import run_dashboard_server
 from .graph_export import write_governance_graph
 from .pipeline import run_local_rc, run_v1_1_rc, run_v2_0_rc
 from .policy import Policy
@@ -109,9 +110,13 @@ def build_parser() -> argparse.ArgumentParser:
     p = graph_sub.add_parser("export", help="Export deterministic v2 governance graph JSON")
     p.add_argument("--out", default=None)
 
-    dashboard = sub.add_parser("dashboard", help="Static read-only dashboard commands")
+    dashboard = sub.add_parser("dashboard", help="Read-only dashboard commands")
     dashboard_sub = dashboard.add_subparsers(dest="dashboard_cmd", required=True)
     p = dashboard_sub.add_parser("build", help="Build the local static v2 dashboard")
+    p.add_argument("--out", default=None)
+    p = dashboard_sub.add_parser("serve", help="Serve the read-only dashboard with live refresh")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8767)
     p.add_argument("--out", default=None)
 
     sessions = sub.add_parser("sessions", help="Local-only session compression commands")
@@ -279,6 +284,10 @@ def main(argv=None) -> int:
         report = build_dashboard(repo_root, args.out)
         _write_json(report)
         return 0 if report["status"] == "PASS" else 1
+
+    if args.cmd == "dashboard" and args.dashboard_cmd == "serve":
+        run_dashboard_server(repo_root, host=args.host, port=args.port, out=args.out)
+        return 0
 
     if args.cmd == "sessions" and args.sessions_cmd == "compress":
         report = compress_sessions(repo_root, args.input, args.out_dir)

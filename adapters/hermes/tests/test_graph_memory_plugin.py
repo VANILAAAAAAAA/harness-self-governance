@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 
-PLUGIN_PATH = Path(__file__).resolve().parents[2] / "plugins" / "graph_memory" / "__init__.py"
+PLUGIN_PATH = Path(__file__).resolve().parents[1] / "plugins" / "graph-memory" / "__init__.py"
 
 
 def _load_plugin(name: str = "graph_memory_under_test"):
@@ -76,8 +76,11 @@ def test_pre_llm_call_injects_graph_packet_and_skill_mounts(tmp_path, monkeypatc
         },
     }
     (hermes_home / "config.yaml").write_text(json.dumps(config), encoding="utf-8")
+    plugin._load_config = lambda: config
     monkeypatch.setenv("HERMES_HOME", str(hermes_home))
     monkeypatch.setenv("HOME", str(hermes_home / "home"))
+    sys.modules.pop("agent_memory_graph.retrieve", None)
+    sys.modules.pop("agent_memory_graph", None)
 
     result = plugin.pre_llm_call(
         session_id="s1",
@@ -112,9 +115,11 @@ def test_observe_mode_traces_without_injection(tmp_path, monkeypatch):
         "    return {'status': 'PASS', 'selected_profile': 'general', 'selected_project': 'p', 'hit_count': 1}\n",
         encoding="utf-8",
     )
-    (hermes_home / "config.yaml").write_text(json.dumps({
+    config = {
         "graph_memory": {"enabled": True, "mode": "observe", "repo_roots": [str(repo)], "trace_dir": str(tmp_path / "traces")}
-    }), encoding="utf-8")
+    }
+    (hermes_home / "config.yaml").write_text(json.dumps(config), encoding="utf-8")
+    plugin._load_config = lambda: config
     monkeypatch.setenv("HERMES_HOME", str(hermes_home))
 
     assert plugin.pre_llm_call(session_id="s2", user_message=f"[Workspace: {tmp_path}] task", conversation_history=[]) is None
@@ -147,13 +152,18 @@ def test_post_llm_call_can_capture_pending_update(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     mem = tmp_path / "mem"
-    (hermes_home / "config.yaml").write_text(json.dumps({
+    config = {
         "graph_memory": {
             "enabled": True, "mode": "inject", "repo_roots": [str(repo)],
             "capture_pending_updates": True, "memory_root": str(mem), "trace_dir": str(tmp_path / "traces")
         }
-    }), encoding="utf-8")
+    }
+    (hermes_home / "config.yaml").write_text(json.dumps(config), encoding="utf-8")
+    plugin._load_config = lambda: config
     monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    sys.modules.pop("agent_memory_graph.retrieve", None)
+    sys.modules.pop("agent_memory_graph.pending_updates", None)
+    sys.modules.pop("agent_memory_graph", None)
 
     plugin.pre_llm_call(session_id="s3", user_message=f"[Workspace: {tmp_path}] task", conversation_history=[])
     plugin.post_llm_call(session_id="s3", user_message="我决定 graph memory 必须捕获 pending update", assistant_response="ok")

@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 import re
+import threading
+import urllib.request
 from pathlib import Path
 
 from graph_harness_maintain.dashboard import build_dashboard, build_dashboard_data, build_graph_summary, collect_file_inventory, render_preview
+from graph_harness_maintain.dashboard_server import serve_dashboard
 
 ROOT = Path(__file__).parents[1]
 
@@ -46,6 +49,9 @@ def test_dashboard_file_generated_as_two_page_graph_logs_app() -> None:
         "Metadata",
         "Lineage",
         "governance-data",
+        "startLiveRefresh",
+        "/api/dashboard-data",
+        "dashboard_signature",
         "Drag nodes to reposition",
         "Click nodes or edges to inspect",
         "Scroll to zoom",
@@ -330,6 +336,27 @@ def test_collect_file_inventory_handles_missing_dirs_and_previews_json(tmp_path:
     assert json_item["preview"].startswith("{")
     assert '"a"' in json_item["preview"]
     assert json_item["lineage"]
+
+
+def test_live_dashboard_server_exposes_fresh_data_endpoint() -> None:
+    server = serve_dashboard(ROOT, host="127.0.0.1", port=0, out=ROOT / "artifacts" / "v2" / "dashboard" / "test-live-index.html")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        host, port = server.server_address
+        with urllib.request.urlopen(f"http://{host}:{port}/api/status", timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        assert payload["status"] == "PASS"
+        assert payload["dashboard_signature"]
+        assert any(item["profile_id"] == "general" for item in payload["projects"])
+        with urllib.request.urlopen(f"http://{host}:{port}/", timeout=20) as response:
+            html = response.read().decode("utf-8")
+        assert "startLiveRefresh" in html
+        assert "/api/dashboard-data" in html
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
 
 
 def test_render_preview_truncates_large_text() -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -639,7 +640,7 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         "skill_counts": runtime_traces.get("skill_counts", {}),
         "trace_report": runtime_traces,
     }
-    return {
+    payload = {
         "schema_version": "2.0",
         "app": {"name": "Governance Hub", "version": "v2.0", "default_route": "#/graph"},
         "context_router": context_router,
@@ -677,6 +678,15 @@ def build_dashboard_data(repo_root: Path | str) -> dict[str, Any]:
         "log_groups": list(INVENTORY_ROOTS.keys()),
         "safety_boundary": safety,
     }
+    signature_basis = {
+        "graph_nodes": [node.get("id") for node in governance_graph.get("nodes", [])],
+        "graph_edges": [edge.get("id") for edge in governance_graph.get("edges", [])],
+        "projects": [(m.get("profile_id"), m.get("project_id"), m.get("updated_at"), m.get("summary_path")) for m in project_manifests],
+        "runtime": runtime_observability,
+    }
+    payload["dashboard_signature"] = hashlib.sha256(json.dumps(signature_basis, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+    payload["live_refresh"] = {"supported": True, "endpoint": "/api/dashboard-data", "poll_seconds": 3, "mode": "reload_on_signature_change"}
+    return payload
 
 
 def _html(data: dict[str, Any]) -> str:
@@ -794,6 +804,34 @@ pre {{ margin:0; white-space:pre-wrap; overflow:auto; max-height:52vh; backgroun
 <script id="governance-data" type="application/json">{payload}</script>
 <script>
 const DATA = JSON.parse(document.getElementById('governance-data').textContent);
+const INITIAL_DASHBOARD_SIGNATURE = DATA.dashboard_signature || '';
+let liveRefreshState = {{last: INITIAL_DASHBOARD_SIGNATURE, inFlight: false}};
+function startLiveRefresh(){{
+  if (!location.protocol.startsWith('http')) return;
+  const endpoint = (DATA.live_refresh && DATA.live_refresh.endpoint) || '/api/dashboard-data';
+  const pollMs = Math.max(1000, Number((DATA.live_refresh && DATA.live_refresh.poll_seconds) || 3) * 1000);
+  const poll = async () => {{
+    if (liveRefreshState.inFlight) return;
+    liveRefreshState.inFlight = true;
+    try {{
+      const response = await fetch(endpoint + '?summary=1&t=' + Date.now(), {{cache: 'no-store'}});
+      if (!response.ok) return;
+      const fresh = await response.json();
+      const next = fresh.dashboard_signature || fresh.signature || '';
+      if (next && liveRefreshState.last && next !== liveRefreshState.last) {{
+        location.reload();
+      }} else if (next) {{
+        liveRefreshState.last = next;
+      }}
+    }} catch (err) {{
+      console.warn('live dashboard refresh unavailable', err);
+    }} finally {{
+      liveRefreshState.inFlight = false;
+    }}
+  }};
+  setInterval(poll, pollMs);
+}}
+startLiveRefresh();
 DATA.graphs = DATA.graphs || {{governance: DATA.graph}};
 DATA.graph_summaries = DATA.graph_summaries || {{governance: DATA.graph_summary}};
 DATA.graph_filter_catalog = DATA.graph_filter_catalog || {{governance: DATA.graph_filter_types || []}};

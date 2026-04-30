@@ -36,12 +36,112 @@ def _utc_now() -> str:
 
 
 def _load_config() -> dict[str, Any]:
+    env_home = os.environ.get("HERMES_HOME")
+    if env_home:
+        cfg = _load_config_file(Path(env_home).expanduser() / "config.yaml")
+        if cfg:
+            return cfg
     try:
         from hermes_cli.config import load_config
         cfg = load_config() or {}
+        if isinstance(cfg, dict) and isinstance(cfg.get("graph_memory"), dict) and cfg.get("graph_memory"):
+            return cfg
+    except Exception:
+        pass
+    return _load_config_file(_hermes_home() / "config.yaml")
+
+
+def _load_config_file(config_path: Path) -> dict[str, Any]:
+    if not config_path.exists():
+        return {}
+    try:
+        raw = config_path.read_text(encoding="utf-8")
+        try:
+            import yaml
+            cfg = yaml.safe_load(raw) or {}
+        except Exception:
+            try:
+                cfg = json.loads(raw)
+            except Exception:
+                cfg = _parse_profile_config_fallback(raw)
         return cfg if isinstance(cfg, dict) else {}
     except Exception:
         return {}
+
+
+def _parse_simple_scalar(value: str) -> Any:
+    value = value.strip()
+    if value in {"true", "True"}:
+        return True
+    if value in {"false", "False"}:
+        return False
+    if value in {"null", "None", "~"}:
+        return None
+    if (value.startswith("'") and value.endswith("'")) or (value.startswith('"') and value.endswith('"')):
+        return value[1:-1]
+    try:
+        return int(value)
+    except ValueError:
+        return value
+
+
+def _parse_profile_config_fallback(raw: str) -> dict[str, Any]:
+    """Parse the graph_memory YAML block when PyYAML is unavailable."""
+    graph_memory: dict[str, Any] = {}
+    lines = raw.splitlines()
+    in_block = False
+    block_indent = 0
+    current_list_key: str | None = None
+    current_mapping_key: str | None = None
+    current_mapping_item: str | None = None
+    for line in lines:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        stripped = line.strip()
+        if not in_block:
+            if stripped == "graph_memory:":
+                in_block = True
+                block_indent = indent
+            continue
+        if indent <= block_indent:
+            break
+        rel = indent - block_indent
+        if rel == 2 and ":" in stripped and not stripped.startswith("-"):
+            key, value = stripped.split(":", 1)
+            key = key.strip()
+            value = value.strip()
+            current_list_key = None
+            current_mapping_key = None
+            current_mapping_item = None
+            if value:
+                graph_memory[key] = _parse_simple_scalar(value)
+            else:
+                if key in {"repo_roots"}:
+                    graph_memory[key] = []
+                    current_list_key = key
+                elif key in {"repo_project_hints"}:
+                    graph_memory[key] = {}
+                    current_mapping_key = key
+                else:
+                    graph_memory[key] = {}
+                    current_mapping_key = key
+            continue
+        if rel == 2 and stripped.startswith("- ") and current_list_key:
+            graph_memory.setdefault(current_list_key, []).append(_parse_simple_scalar(stripped[2:].strip()))
+            continue
+        if rel == 4 and stripped.startswith("- ") and current_list_key:
+            graph_memory.setdefault(current_list_key, []).append(_parse_simple_scalar(stripped[2:].strip()))
+            continue
+        if rel == 4 and current_mapping_key and stripped.endswith(":"):
+            current_mapping_item = stripped[:-1].strip()
+            graph_memory.setdefault(current_mapping_key, {})[current_mapping_item] = {}
+            continue
+        if rel >= 6 and current_mapping_key and current_mapping_item and ":" in stripped:
+            key, value = stripped.split(":", 1)
+            graph_memory.setdefault(current_mapping_key, {}).setdefault(current_mapping_item, {})[key.strip()] = _parse_simple_scalar(value.strip())
+            continue
+    return {"graph_memory": graph_memory} if graph_memory else {}
 
 
 def _plugin_config() -> dict[str, Any]:
@@ -76,11 +176,14 @@ def _plugin_config() -> dict[str, Any]:
 
 
 def _hermes_home() -> Path:
+    raw = os.environ.get("HERMES_HOME")
+    if raw:
+        return Path(raw).expanduser().resolve()
     try:
         from hermes_constants import get_hermes_home
         return Path(get_hermes_home()).expanduser().resolve()
     except Exception:
-        return Path(os.environ.get("HERMES_HOME", "~/.hermes")).expanduser().resolve()
+        return Path("~/.hermes").expanduser().resolve()
 
 
 def _memory_root(config: dict[str, Any]) -> Path | None:
@@ -184,10 +287,22 @@ def _ensure_repo_import(repo: Path) -> None:
             sys.path.insert(0, s)
 
 
-def _project_hints_for_repo(repo: Path, config: dict[str, Any]) -> tuple[str | None, str | None]:
+def _project_hints_for_repo(repo: Path, config: dict[str, Any], workspace: Path | None = None) -> tuple[str | None, str | None]:
     mapping = config.get("repo_project_hints") or {}
-    keys = [repo.as_posix(), repo.name]
+    keys: list[str] = []
+    if workspace:
+        try:
+            ws = workspace.expanduser().resolve()
+            keys.extend([p.as_posix() for p in _ancestors(ws)])
+            keys.extend([p.name for p in _ancestors(ws)])
+        except Exception:
+            pass
+    keys.extend([repo.as_posix(), repo.name])
+    seen: set[str] = set()
     for key in keys:
+        if key in seen:
+            continue
+        seen.add(key)
         raw = mapping.get(key) if isinstance(mapping, dict) else None
         if isinstance(raw, dict):
             return raw.get("profile") or config.get("default_profile") or None, raw.get("project") or config.get("default_project") or None
@@ -197,7 +312,7 @@ def _project_hints_for_repo(repo: Path, config: dict[str, Any]) -> tuple[str | N
     return config.get("default_profile") or None, config.get("default_project") or None
 
 
-def _call_retriever(repo: Path, query: str, config: dict[str, Any]) -> dict[str, Any]:
+def _call_retriever(repo: Path, query: str, config: dict[str, Any], workspace: Path | None = None) -> dict[str, Any]:
     _ensure_repo_import(repo)
     from agent_memory_graph.retrieve import retrieve_project_context
     memory_root = _memory_root(config)
@@ -206,7 +321,7 @@ def _call_retriever(repo: Path, query: str, config: dict[str, Any]) -> dict[str,
     if evidence_depth == "raw-span" and not config.get("raw_span_enabled", False):
         evidence_depth = "anchor"
         budget = "fast" if budget == "forensic" else budget
-    profile_hint, project_hint = _project_hints_for_repo(repo, config)
+    profile_hint, project_hint = _project_hints_for_repo(repo, config, workspace=workspace)
     return retrieve_project_context(
         repo,
         query or "",
@@ -225,7 +340,7 @@ def _score_packet(packet: dict[str, Any]) -> tuple[int, int]:
     return (status_score, hit_count + skill_count)
 
 
-def _retrieve_best_packet(repos: list[Path], query: str, config: dict[str, Any]) -> tuple[dict[str, Any] | None, Path | None, list[dict[str, Any]]]:
+def _retrieve_best_packet(repos: list[Path], query: str, config: dict[str, Any], workspace: Path | None = None) -> tuple[dict[str, Any] | None, Path | None, list[dict[str, Any]]]:
     attempts: list[dict[str, Any]] = []
     best_packet: dict[str, Any] | None = None
     best_repo: Path | None = None
@@ -233,7 +348,7 @@ def _retrieve_best_packet(repos: list[Path], query: str, config: dict[str, Any])
     for repo in repos:
         started = time.perf_counter()
         try:
-            packet = _call_retriever(repo, query, config)
+            packet = _call_retriever(repo, query, config, workspace=workspace)
             elapsed = round((time.perf_counter() - started) * 1000, 3)
             attempts.append({"repo": repo.as_posix(), "status": packet.get("status"), "latency_ms": elapsed, "project": packet.get("selected_project")})
             score = _score_packet(packet)
